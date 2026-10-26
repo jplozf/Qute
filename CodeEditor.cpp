@@ -62,6 +62,14 @@ void CodeEditor::setTheme(EditorTheme theme) {
         p.setColor(QPalette::Base, QColor(39, 40, 34));
         p.setColor(QPalette::Text, QColor(248, 248, 242));
         break;
+    case EditorTheme::SolarizedDark:
+        p.setColor(QPalette::Base, QColor(0, 43, 54));       // Deep Blue-Green
+        p.setColor(QPalette::Text, QColor(131, 148, 150));   // Light Cyan-Gray
+        break;
+    case EditorTheme::Nord:
+        p.setColor(QPalette::Base, QColor(46, 52, 64));      // Dark Navy Gray
+        p.setColor(QPalette::Text, QColor(216, 222, 233));   // Ice White
+        break;
     }
     setPalette(p);
     highlightCurrentLine();
@@ -78,8 +86,12 @@ void CodeEditor::highlightCurrentLine() {
             lineColor = QColor(230, 240, 250);
         else if (m_theme == EditorTheme::DarkVS)
             lineColor = QColor(45, 45, 48);
-        else // Monokai
+        else if (m_theme == EditorTheme::Monokai)
             lineColor = QColor(62, 61, 50);
+        else if (m_theme == EditorTheme::SolarizedDark)
+            lineColor = QColor(7, 54, 66);
+        else // Nord
+            lineColor = QColor(59, 66, 82);
 
         selection.format.setBackground(lineColor);
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -102,9 +114,15 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     } else if (m_theme == EditorTheme::DarkVS) {
         sidebarBg = QColor(37, 37, 38);
         textColor = QColor(133, 133, 133);
-    } else { // Monokai
+    } else if (m_theme == EditorTheme::Monokai) {
         sidebarBg = QColor(30, 31, 24);
         textColor = QColor(145, 143, 125);
+    } else if (m_theme == EditorTheme::SolarizedDark) {
+        sidebarBg = QColor(7, 54, 66);
+        textColor = QColor(88, 110, 117);
+    } else { // Nord
+        sidebarBg = QColor(59, 66, 82);
+        textColor = QColor(76, 86, 106);
     }
 
     painter.fillRect(event->rect(), sidebarBg);

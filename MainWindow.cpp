@@ -16,6 +16,8 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), tabWidget(new QTabWidget(this)), findDialog(nullptr), currentTheme(EditorTheme::Light)
 {
+    appConstants = new Constants();
+
     setCentralWidget(tabWidget);
     tabWidget->setTabsClosable(true);
 
@@ -35,14 +37,14 @@ MainWindow::MainWindow(QWidget *parent)
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp), this, SLOT(previousTab()));
 
     resize(900, 700);
-    setWindowTitle("Qt Text Editor");
+    setWindowTitle(appConstants->getQString("APPLICATION_NAME"));
 
     // Default Font
     currentEditorFont = QFont("Monospace", 11);
     currentEditorFont.setStyleHint(QFont::TypeWriter);
 
     // Restore Session Settings & Preferences
-    QSettings settings("QtTextEditor", "TextEditor");
+    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
     restoreGeometry(settings.value("geometry").toByteArray());
 
     if (settings.contains("font")) {
@@ -86,7 +88,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         }
     }
 
-    QSettings settings("QtTextEditor", "TextEditor");
+    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
     settings.setValue("geometry", saveGeometry());
     settings.setValue("font", currentEditorFont);
     settings.setValue("theme", static_cast<int>(currentTheme));
@@ -197,7 +199,13 @@ void MainWindow::chooseFont() {
 }
 
 void MainWindow::selectTheme() {
-    QStringList themes = {tr("Light"), tr("Dark (VS Code)"), tr("Monokai")};
+    QStringList themes = {
+        tr("Light"),
+        tr("Dark (VS Code)"),
+        tr("Monokai"),
+        tr("Solarized Dark"),
+        tr("Nord")
+    };
     int currentIndex = static_cast<int>(currentTheme);
 
     bool ok;
@@ -206,6 +214,8 @@ void MainWindow::selectTheme() {
         if (item == themes[0]) currentTheme = EditorTheme::Light;
         else if (item == themes[1]) currentTheme = EditorTheme::DarkVS;
         else if (item == themes[2]) currentTheme = EditorTheme::Monokai;
+        else if (item == themes[3]) currentTheme = EditorTheme::SolarizedDark;
+        else if (item == themes[4]) currentTheme = EditorTheme::Nord;
 
         applySettingsToAllEditors();
     }
@@ -350,6 +360,7 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
     editor->setPlainText(in.readAll());
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
+    hl->setLanguage(detectLanguage(fileName));
     hl->setTheme(currentTheme);
 
     connect(editor, &CodeEditor::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
@@ -436,4 +447,16 @@ void MainWindow::closeTab(int index) {
     if (tabWidget->count() == 0) {
         newFile();
     }
+}
+
+ProgrammingLanguage detectLanguage(const QString &fileName) {
+    if (fileName.endsWith(".py", Qt::CaseInsensitive))
+        return ProgrammingLanguage::Python;
+    if (fileName.endsWith(".go", Qt::CaseInsensitive))
+        return ProgrammingLanguage::Go;
+    if (fileName.endsWith(".js", Qt::CaseInsensitive) || fileName.endsWith(".ts", Qt::CaseInsensitive))
+        return ProgrammingLanguage::JavaScript;
+
+    // Default to C++ for .cpp, .h, .c, .cc, or unknown extensions
+    return ProgrammingLanguage::Cpp;
 }

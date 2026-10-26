@@ -8,11 +8,13 @@
 #include <QMenu>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
+#include "constants.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     MainWindow(QWidget *parent = nullptr);
+    Constants *appConstants;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -61,3 +63,5 @@ private:
     void updateRecentFileActions();
     void addToRecentFiles(const QString &fileName);
 };
+
+ProgrammingLanguage detectLanguage(const QString &fileName);

@@ -7,7 +7,16 @@
 enum class EditorTheme {
     Light,
     DarkVS,
-    Monokai
+    Monokai,
+    SolarizedDark,
+    Nord
+};
+
+enum class ProgrammingLanguage {
+    Cpp,
+    Python,
+    Go,
+    JavaScript
 };
 
 class SyntaxHighlighter : public QSyntaxHighlighter {
@@ -15,6 +24,9 @@ class SyntaxHighlighter : public QSyntaxHighlighter {
 public:
     explicit SyntaxHighlighter(QTextDocument *parent = nullptr);
     void setTheme(EditorTheme theme);
+
+    void setLanguage(ProgrammingLanguage lang);
+    ProgrammingLanguage language() const { return m_lang; }
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -30,6 +42,9 @@ private:
     QTextCharFormat singleLineCommentFormat;
     QTextCharFormat quotationFormat;
     QTextCharFormat functionFormat;
+
+    EditorTheme m_theme = EditorTheme::Light;
+    ProgrammingLanguage m_lang = ProgrammingLanguage::Cpp;
 
     void setupRules();
 };
