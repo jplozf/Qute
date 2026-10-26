@@ -1,1 +1,1 @@
-added tool bar
+added dialog for settings

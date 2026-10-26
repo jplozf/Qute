@@ -10,6 +10,7 @@
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
+#include "SettingsDialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -30,6 +31,7 @@ private slots:
     void updateCursorPosition();
     void currentTabChanged(int index);
     void documentModified(bool modified);
+    void openSettings();
 
     void cut();
     void copy();
@@ -38,8 +40,6 @@ private slots:
     void nextTab();
     void previousTab();
 
-    void chooseFont();
-    void selectTheme();
     void openRecentFile();
 
 private:
@@ -64,6 +64,7 @@ private:
     QAction *pasteAction;
     QAction *findAction;
     QAction *closeTabAction;
+    QAction *settingsAction;
 
     void setupMenus();
     void setupToolBar();

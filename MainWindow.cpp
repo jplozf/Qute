@@ -174,8 +174,19 @@ void MainWindow::setupMenus() {
 
     // Settings Menu
     QMenu *settingsMenu = menuBar()->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("Choose &Font..."), this, &MainWindow::chooseFont);
-    settingsMenu->addAction(tr("Select &Theme..."), this, &MainWindow::selectTheme);
+    settingsAction = new QAction(tr("&Preferences ..."), this);
+    settingsAction->setIcon(QIcon(":/icons/Gear.png"));
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
+    settingsMenu->addAction(settingsAction);
+}
+
+void MainWindow::openSettings() {
+    SettingsDialog dialog(currentEditorFont, currentTheme, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        currentEditorFont = dialog.getSelectedFont();
+        currentTheme = dialog.getSelectedTheme();
+        applySettingsToAllEditors();
+    }
 }
 
 void MainWindow::setupToolBar() {
@@ -188,6 +199,8 @@ void MainWindow::setupToolBar() {
     toolBar->addAction(saveAction);
     toolBar->addSeparator();
     toolBar->addAction(findAction);
+    toolBar->addSeparator();
+    toolBar->addAction(settingsAction);
 }
 
 void MainWindow::addToRecentFiles(const QString &fileName) {
@@ -235,38 +248,6 @@ void MainWindow::openRecentFile() {
             recentFiles.removeAll(fileName);
             updateRecentFileActions();
         }
-    }
-}
-
-void MainWindow::chooseFont() {
-    bool ok;
-    QFont font = QFontDialog::getFont(&ok, currentEditorFont, this, tr("Choose Monospace Font"));
-    if (ok) {
-        currentEditorFont = font;
-        applySettingsToAllEditors();
-    }
-}
-
-void MainWindow::selectTheme() {
-    QStringList themes = {
-        tr("Light"),
-        tr("Dark (VS Code)"),
-        tr("Monokai"),
-        tr("Solarized Dark"),
-        tr("Nord")
-    };
-    int currentIndex = static_cast<int>(currentTheme);
-
-    bool ok;
-    QString item = QInputDialog::getItem(this, tr("Select Syntax Theme"), tr("Theme:"), themes, currentIndex, false, &ok);
-    if (ok && !item.isEmpty()) {
-        if (item == themes[0]) currentTheme = EditorTheme::Light;
-        else if (item == themes[1]) currentTheme = EditorTheme::DarkVS;
-        else if (item == themes[2]) currentTheme = EditorTheme::Monokai;
-        else if (item == themes[3]) currentTheme = EditorTheme::SolarizedDark;
-        else if (item == themes[4]) currentTheme = EditorTheme::Nord;
-
-        applySettingsToAllEditors();
     }
 }
 

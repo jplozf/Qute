@@ -22,6 +22,9 @@ add_executable(Qute
     FindReplaceDialog.cpp
     constants.h constants.cpp
     Qute.qrc
+    SettingsDialog.h
+    SettingsDialog.cpp
+    SettingsDialog.h SettingsDialog.cpp
     commit_message.txt
 )
 

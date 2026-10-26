@@ -6,8 +6,8 @@
 //******************************************************************************
 Constants::Constants()
 {
-    constants["AUTHOR"]    = std::string("J.-P. Liguori");
-    constants["COPYRIGHT"] = std::string("Copyright 2026, J.-P. Liguori");
+    constants["AUTHOR"]    = std::string("J.P. Liguori");
+    constants["COPYRIGHT"] = std::string("Copyright 2026, J.P. Liguori");
     constants["EMAIL"]     = std::string("jpl@ozf.fr");
 
     constants["ORGANIZATION_NAME"]      = std::string("Open Zero Factory");
