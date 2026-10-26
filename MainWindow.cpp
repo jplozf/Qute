@@ -2,6 +2,7 @@
 #include "SyntaxHighlighter.h"
 #include "CodeEditor.h"
 #include <QMenuBar>
+#include <QToolBar>
 #include <QStatusBar>
 #include <QFileDialog>
 #include <QFontDialog>
@@ -29,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     statusBar()->addPermanentWidget(statusLabel);
 
     setupMenus();
+    setupToolBar();
 
     // Global keyboard shortcuts for tab navigation
     // new QShortcut(QKeySystemShortcut(QKeySequence::NextChild), this, SLOT(nextTab()));
@@ -109,36 +111,83 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::setupMenus() {
-    // File Menu
-    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("&New"), this, &MainWindow::newFile, QKeySequence::New);
-    fileMenu->addAction(tr("&Open..."), this, &MainWindow::openFile, QKeySequence::Open);
+    // File Menu Actions
+    newAction = new QAction(tr("&New"), this);
+    newAction->setShortcut(QKeySequence::New);
+    newAction->setIcon(QIcon(":/icons/Document Text.png"));
+    connect(newAction, &QAction::triggered, this, &MainWindow::newFile);
 
-    // Recent Files Submenu
+    openAction = new QAction(tr("&Open..."), this);
+    openAction->setShortcut(QKeySequence::Open);
+    openAction->setIcon(QIcon(":/icons/Folder Open.png"));
+    connect(openAction, &QAction::triggered, this, &MainWindow::openFile);
+
+    saveAction = new QAction(tr("&Save"), this);
+    saveAction->setShortcut(QKeySequence::Save);
+    saveAction->setIcon(QIcon(":/icons/Save.png"));
+    connect(saveAction, &QAction::triggered, this, &MainWindow::saveFile);
+
+    closeTabAction = new QAction(tr("&Close Tab"), this);
+    closeTabAction->setShortcut(QKeySequence::Close);
+    connect(closeTabAction, &QAction::triggered, this, &MainWindow::closeCurrentTab);
+
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+    fileMenu->addAction(newAction);
+    fileMenu->addAction(openAction);
+
     recentFilesMenu = fileMenu->addMenu(tr("Open &Recent"));
     for (int i = 0; i < MaxRecentFiles; ++i) {
         recentFileActions[i] = recentFilesMenu->addAction(QString(), this, &MainWindow::openRecentFile);
         recentFileActions[i]->setVisible(false);
     }
 
-    fileMenu->addAction(tr("&Save"), this, &MainWindow::saveFile, QKeySequence::Save);
+    fileMenu->addAction(saveAction);
     fileMenu->addSeparator();
-    fileMenu->addAction(tr("&Close Tab"), this, &MainWindow::closeCurrentTab, QKeySequence::Close);
+    fileMenu->addAction(closeTabAction);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("&Quit"), this, &QWidget::close, QKeySequence::Quit);
 
-    // Edit Menu
+    // Edit Menu Actions
+    cutAction = new QAction(tr("Cu&t"), this);
+    cutAction->setShortcut(QKeySequence::Cut);
+    connect(cutAction, &QAction::triggered, this, &MainWindow::cut);
+
+    copyAction = new QAction(tr("&Copy"), this);
+    copyAction->setShortcut(QKeySequence::Copy);
+    connect(copyAction, &QAction::triggered, this, &MainWindow::copy);
+
+    pasteAction = new QAction(tr("&Paste"), this);
+    pasteAction->setShortcut(QKeySequence::Paste);
+    connect(pasteAction, &QAction::triggered, this, &MainWindow::paste);
+
+    findAction = new QAction(tr("&Find / Replace..."), this);
+    findAction->setShortcut(QKeySequence::Find);
+    findAction->setIcon(QIcon(":/icons/Search.png"));
+    connect(findAction, &QAction::triggered, this, &MainWindow::showFindDialog);
+
     QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
-    editMenu->addAction(tr("Cu&t"), this, &MainWindow::cut, QKeySequence::Cut);
-    editMenu->addAction(tr("&Copy"), this, &MainWindow::copy, QKeySequence::Copy);
-    editMenu->addAction(tr("&Paste"), this, &MainWindow::paste, QKeySequence::Paste);
+    editMenu->addAction(cutAction);
+    editMenu->addAction(copyAction);
+    editMenu->addAction(pasteAction);
     editMenu->addSeparator();
-    editMenu->addAction(tr("&Find / Replace..."), this, &MainWindow::showFindDialog, QKeySequence::Find);
+    editMenu->addAction(findAction);
 
     // Settings Menu
     QMenu *settingsMenu = menuBar()->addMenu(tr("&Settings"));
     settingsMenu->addAction(tr("Choose &Font..."), this, &MainWindow::chooseFont);
     settingsMenu->addAction(tr("Select &Theme..."), this, &MainWindow::selectTheme);
+}
+
+void MainWindow::setupToolBar() {
+    QToolBar *toolBar = addToolBar(tr("Main Toolbar"));
+    toolBar->setMovable(false);
+    toolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+
+    toolBar->addAction(newAction);
+    toolBar->addAction(openAction);
+    toolBar->addAction(saveAction);
+    toolBar->addSeparator();
+    toolBar->addAction(findAction);
 }
 
 void MainWindow::addToRecentFiles(const QString &fileName) {

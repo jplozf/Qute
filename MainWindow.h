@@ -6,6 +6,7 @@
 #include <QCloseEvent>
 #include <QAction>
 #include <QMenu>
+#include <QToolBar>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -54,7 +55,18 @@ private:
     QAction *recentFileActions[MaxRecentFiles];
     QStringList recentFiles;
 
+    // Shared Action Pointers for Menu and Toolbar
+    QAction *newAction;
+    QAction *openAction;
+    QAction *saveAction;
+    QAction *cutAction;
+    QAction *copyAction;
+    QAction *pasteAction;
+    QAction *findAction;
+    QAction *closeTabAction;
+
     void setupMenus();
+    void setupToolBar();
     void openFileWithPath(const QString &fileName);
     bool maybeSave(CodeEditor *editor);
     CodeEditor *currentEditor();
