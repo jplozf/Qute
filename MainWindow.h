@@ -48,6 +48,7 @@ private:
     QTabWidget *tabWidget;
     FindReplaceDialog *findDialog;
     QLabel *statusLabel;
+    QLabel *versionLabel;
     QFont currentEditorFont;
     EditorTheme currentTheme;
 

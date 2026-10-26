@@ -26,8 +26,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(tabWidget, &QTabWidget::currentChanged, this, &MainWindow::currentTabChanged);
 
     // Setup Status Bar
+    QString aboutText = QString("Version : %1.%2-%3")
+                            .arg(APP_VERSION)
+                            .arg(GIT_COMMIT_COUNT)
+                            .arg(GIT_HASH);
+    versionLabel = new QLabel(aboutText, this);
+    versionLabel->setStyleSheet("color: gray;"); // Optional: subtle styling
+    statusBar()->addWidget(versionLabel);       // Left side of the status bar
+
     statusLabel = new QLabel(this);
-    statusBar()->addPermanentWidget(statusLabel);
+    statusBar()->addPermanentWidget(statusLabel); // Right side (Cursor position)
 
     setupMenus();
     setupToolBar();
