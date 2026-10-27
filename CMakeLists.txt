@@ -49,6 +49,7 @@ add_executable(Qute
     SettingsDialog.cpp
     SettingsDialog.h SettingsDialog.cpp
     commit_message.txt
+    TODO
 )
 
 target_link_libraries(Qute PRIVATE Qt6::Widgets Qt6::PrintSupport)

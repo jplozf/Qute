@@ -14,9 +14,14 @@ public:
     int lineNumberAreaWidth();
     void setTheme(EditorTheme theme);
     EditorTheme currentTheme() const { return m_theme; }
+    void setTabWidth(int width);
+    void setInsertSpacesForTabs(bool enabled);
+    int tabWidth() const { return m_tabWidth; }
+    bool insertSpacesForTabs() const { return m_insertSpaces; }
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
@@ -26,6 +31,8 @@ private slots:
 private:
     QWidget *lineNumberArea;
     EditorTheme m_theme = EditorTheme::Light;
+    int m_tabWidth = 4;
+    bool m_insertSpaces = true;
 };
 
 class LineNumberArea : public QWidget {

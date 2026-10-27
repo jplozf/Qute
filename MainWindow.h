@@ -7,6 +7,7 @@
 #include <QAction>
 #include <QMenu>
 #include <QToolBar>
+#include <QMessageBox>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -15,7 +16,7 @@
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
-    MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(const QStringList &commandLineFiles = QStringList(), QWidget *parent = nullptr);
     Constants *appConstants;
 
 protected:
@@ -47,8 +48,13 @@ private slots:
     void zoomOut();
     void print();
 
+    void convertToSpaces();
+    void convertToTabs();
+
 private:
     enum { MaxRecentFiles = 5 };
+    int currentTabWidth = 4;
+    bool currentInsertSpaces = true;
 
     QTabWidget *tabWidget;
     FindReplaceDialog *findDialog;
@@ -76,6 +82,8 @@ private:
     QAction *zoomInAction;
     QAction *zoomOutAction;
     QAction *printAction;
+    QAction *convertToSpacesAction;
+    QAction *convertToTabsAction;
 
     void setupMenus();
     void setupToolBar();
@@ -87,7 +95,16 @@ private:
     void updateRecentFileActions();
     void addToRecentFiles(const QString &fileName);
     QString languageToString(ProgrammingLanguage lang);
+    void applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lang);
+};
+
+struct IndentInfo {
+    bool usesSpaces = true;
+    int width = 4;
+    bool detected = false;
 };
 
 ProgrammingLanguage detectLanguage(const QString &fileName);
 QString formatByteSize(qint64 bytes);
+IndentInfo detectFileIndentation(const QString &content);
+QString convertIndentation(const QString &content, bool targetSpaces, int targetWidth, bool sourceSpaces, int sourceWidth);

@@ -15,8 +15,9 @@
 #include <QShortcut>
 #include <QPrintDialog>
 #include <QPrinter>
+#include <QDialog>
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     : QMainWindow(parent), tabWidget(new QTabWidget(this)), findDialog(nullptr), currentTheme(EditorTheme::Light)
 {
     appConstants = new Constants();
@@ -65,21 +66,35 @@ MainWindow::MainWindow(QWidget *parent)
     if (settings.contains("theme")) {
         currentTheme = static_cast<EditorTheme>(settings.value("theme").toInt());
     }
+    if (settings.contains("tabWidth")) {
+        currentTabWidth = settings.value("tabWidth").toInt();
+    }
+    if (settings.contains("insertSpaces")) {
+        currentInsertSpaces = settings.value("insertSpaces").toBool();
+    }
 
     recentFiles = settings.value("recentFiles").toStringList();
     updateRecentFileActions();
 
-    QStringList openFiles = settings.value("openFiles").toStringList();
-    int currentIndex = settings.value("currentIndex", 0).toInt();
-
-    if (!openFiles.isEmpty()) {
-        for (const QString &file : openFiles) {
-            if (QFile::exists(file)) {
-                openFileWithPath(file);
-            }
+    // --- Handle Command Line Files vs Session Restoration ---
+    if (!commandLineFiles.isEmpty()) {
+        for (const QString &filePath : commandLineFiles) {
+            QString absPath = QFileInfo(filePath).absoluteFilePath();
+            openFileWithPath(absPath); // Opens existing files or creates a new buffer if it doesn't exist yet
         }
-        if (tabWidget->count() > 0) {
-            tabWidget->setCurrentIndex(qMin(currentIndex, tabWidget->count() - 1));
+    } else {
+        QStringList openFiles = settings.value("openFiles").toStringList();
+        int currentIndex = settings.value("currentIndex", 0).toInt();
+
+        if (!openFiles.isEmpty()) {
+            for (const QString &file : openFiles) {
+                if (QFile::exists(file)) {
+                    openFileWithPath(file);
+                }
+            }
+            if (tabWidget->count() > 0) {
+                tabWidget->setCurrentIndex(qMin(currentIndex, tabWidget->count() - 1));
+            }
         }
     }
 
@@ -105,6 +120,8 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     settings.setValue("font", currentEditorFont);
     settings.setValue("theme", static_cast<int>(currentTheme));
     settings.setValue("recentFiles", recentFiles);
+    settings.setValue("tabWidth", currentTabWidth);
+    settings.setValue("insertSpaces", currentInsertSpaces);
 
     QStringList openFiles;
     for (int i = 0; i < tabWidget->count(); ++i) {
@@ -194,6 +211,16 @@ void MainWindow::setupMenus() {
     editMenu->addSeparator();
     editMenu->addAction(findAction);
 
+    convertToSpacesAction = new QAction(tr("Convert to &Spaces"), this);
+    connect(convertToSpacesAction, &QAction::triggered, this, &MainWindow::convertToSpaces);
+
+    convertToTabsAction = new QAction(tr("Convert to &Tabs"), this);
+    connect(convertToTabsAction, &QAction::triggered, this, &MainWindow::convertToTabs);
+
+    QMenu *indentMenu = editMenu->addMenu(tr("&Indentation"));
+    indentMenu->addAction(convertToSpacesAction);
+    indentMenu->addAction(convertToTabsAction);
+
     // View Menu Actions (Zoom In / Zoom Out)
     zoomInAction = new QAction(tr("Zoom &In"), this);
     zoomInAction->setShortcut(QKeySequence::ZoomIn);
@@ -242,10 +269,19 @@ void MainWindow::print() {
 }
 
 void MainWindow::openSettings() {
-    SettingsDialog dialog(currentEditorFont, currentTheme, this);
+    CodeEditor *editor = currentEditor();
+
+    // Grab policy from the active editor if available, otherwise fall back to globals
+    int activeTabWidth = editor ? editor->tabWidth() : currentTabWidth;
+    bool activeInsertSpaces = editor ? editor->insertSpacesForTabs() : currentInsertSpaces;
+
+    SettingsDialog dialog(currentEditorFont, currentTheme, activeTabWidth, activeInsertSpaces, this);
     if (dialog.exec() == QDialog::Accepted) {
         currentEditorFont = dialog.getSelectedFont();
         currentTheme = dialog.getSelectedTheme();
+        currentTabWidth = dialog.getTabWidth();
+        currentInsertSpaces = dialog.getInsertSpaces();
+
         applySettingsToAllEditors();
     }
 }
@@ -332,6 +368,8 @@ void MainWindow::applySettingsToAllEditors() {
         if (CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i))) {
             editor->setFont(currentEditorFont);
             editor->setTheme(currentTheme);
+            editor->setTabWidth(currentTabWidth);
+            editor->setInsertSpacesForTabs(currentInsertSpaces);
             if (SyntaxHighlighter *hl = editor->document()->findChild<SyntaxHighlighter*>()) {
                 hl->setTheme(currentTheme);
             }
@@ -370,6 +408,7 @@ void MainWindow::updateCursorPosition() {
         statusLabel->clear();
         return;
     }
+
     // Calculate file size and human-readable size
     QString text = editor->toPlainText();
     qint64 byteSize = text.toUtf8().size();
@@ -388,11 +427,17 @@ void MainWindow::updateCursorPosition() {
         if (percentage > 100) percentage = 100;
     }
 
-    // Format status bar text cleanly
-    statusLabel->setText(QString("Size: %1 (%2 bytes)  |  %3%  |  Ln: %4, Col: %5")
+    // Format Tab Policy string (e.g., "Spaces: 4" or "Tabs: 4")
+    QString tabPolicy = editor->insertSpacesForTabs()
+                            ? QString("Spaces: %1").arg(editor->tabWidth())
+                            : QString("Tab: %1").arg(editor->tabWidth());
+
+    // Format status bar text cleanly with the tab policy included
+    statusLabel->setText(QString("Size: %1 (%2 bytes)  |  %3%  |  %4  |  Ln: %5, Col: %6")
                              .arg(humanSize)
                              .arg(byteSize)
                              .arg(percentage)
+                             .arg(tabPolicy)
                              .arg(line)
                              .arg(col));
 }
@@ -489,11 +534,43 @@ void MainWindow::openFileWithPath(const QString &fileName) {
     }
 
     QTextStream in(&file);
+    QString content = in.readAll();
+    file.close();
+
     CodeEditor *editor = new CodeEditor(this);
     editor->setFont(currentEditorFont);
     editor->setTheme(currentTheme);
 
-    editor->setPlainText(in.readAll());
+    ProgrammingLanguage lang = detectLanguage(fileName);
+    applySmartTabPolicy(editor, lang);
+
+    // Check indentation mismatch
+    IndentInfo fileIndent = detectFileIndentation(content);
+    if (fileIndent.detected) {
+        bool targetSpaces = editor->insertSpacesForTabs();
+        int targetWidth = editor->tabWidth();
+
+        if (fileIndent.usesSpaces != targetSpaces || (fileIndent.usesSpaces && fileIndent.width != targetWidth)) {
+            QString fileStyle = fileIndent.usesSpaces ? QString("%1 spaces").arg(fileIndent.width) : "tabs";
+            QString targetStyle = targetSpaces ? QString("%1 spaces").arg(targetWidth) : "tabs";
+
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, tr("Indentation Mismatch"),
+                                          tr("The file '%1' uses %2, but your policy for this language is %3.\n\nWould you like to apply the current policy to this file?")
+                                              .arg(QFileInfo(fileName).fileName())
+                                              .arg(fileStyle)
+                                              .arg(targetStyle),
+                                          QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                content = convertIndentation(content, targetSpaces, targetWidth, fileIndent.usesSpaces, fileIndent.width);
+                editor->document()->setModified(true); // Mark modified so user knows it was changed
+            }
+        }
+    }
+
+    editor->setPlainText(content);
+
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
     hl->setLanguage(detectLanguage(fileName));
     hl->setTheme(currentTheme);
@@ -647,4 +724,137 @@ QString formatByteSize(qint64 bytes) {
         return QString("%1 KB").arg(QString::number(bytes / 1024.0, 'f', 1));
     else
         return QString("%1 MB").arg(QString::number(bytes / (1024.0 * 1024.0), 'f', 1));
+}
+
+void MainWindow::applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lang) {
+    switch (lang) {
+    case ProgrammingLanguage::Python:
+        editor->setInsertSpacesForTabs(true);
+        editor->setTabWidth(4); // PEP 8 standard
+        break;
+    case ProgrammingLanguage::Go:
+        editor->setInsertSpacesForTabs(false); // Go standard style uses literal tabs (\t) via gofmt
+        editor->setTabWidth(4);
+        break;
+    case ProgrammingLanguage::Html:
+    case ProgrammingLanguage::Xml:
+        editor->setInsertSpacesForTabs(true);
+        editor->setTabWidth(2); // Common web/markup convention
+        break;
+    default:
+        // Fall back to user's global preferences for C++, JS, Java, etc.
+        editor->setInsertSpacesForTabs(currentInsertSpaces);
+        editor->setTabWidth(currentTabWidth);
+        break;
+    }
+}
+
+// Scan the first few lines to guess if the file uses tabs or spaces and what width
+IndentInfo detectFileIndentation(const QString &content) {
+    QStringList lines = content.split('\n');
+    int tabCount = 0;
+    QMap<int, int> spaceWidthCounts;
+    int checkedLines = 0;
+
+    for (const QString &line : lines) {
+        if (line.isEmpty()) continue;
+        if (line.startsWith('\t')) {
+            tabCount++;
+        } else if (line.startsWith(' ')) {
+            int spaces = 0;
+            while (spaces < line.length() && line[spaces] == ' ') {
+                spaces++;
+            }
+            if (spaces > 1 && spaces <= 8) {
+                spaceWidthCounts[spaces]++;
+            }
+        }
+        if (++checkedLines > 50) break; // Sample first 50 non-empty lines
+    }
+
+    IndentInfo info;
+    if (tabCount > 3 && tabCount >= spaceWidthCounts.values().size()) {
+        info.usesSpaces = false;
+        info.detected = true;
+    } else if (!spaceWidthCounts.isEmpty()) {
+        int maxCount = 0;
+        int bestWidth = 4;
+        for (auto it = spaceWidthCounts.cbegin(); it != spaceWidthCounts.cend(); ++it) {
+            if (it.value() > maxCount) {
+                maxCount = it.value();
+                bestWidth = it.key();
+            }
+        }
+        info.usesSpaces = true;
+        info.width = bestWidth;
+        info.detected = true;
+    }
+    return info;
+}
+
+// Convert document indentation from source style to target style
+QString convertIndentation(const QString &content, bool targetSpaces, int targetWidth, bool sourceSpaces, int sourceWidth) {
+    QStringList lines = content.split('\n');
+    QStringList convertedLines;
+
+    for (QString line : lines) {
+        int indentLevels = 0;
+        int i = 0;
+
+        if (sourceSpaces) {
+            int leadingSpaces = 0;
+            while (i < line.length() && line[i] == ' ') {
+                leadingSpaces++;
+                i++;
+            }
+            indentLevels = sourceWidth > 0 ? leadingSpaces / sourceWidth : 0;
+        } else {
+            int leadingTabs = 0;
+            while (i < line.length() && line[i] == '\t') {
+                leadingTabs++;
+                i++;
+            }
+            indentLevels = leadingTabs;
+        }
+
+        QString newIndent = targetSpaces ? QString(indentLevels * targetWidth, ' ') : QString(indentLevels, '\t');
+        convertedLines.append(newIndent + line.mid(i));
+    }
+    return convertedLines.join('\n');
+}
+
+void MainWindow::convertToSpaces() {
+    CodeEditor *editor = currentEditor();
+    if (!editor) return;
+
+    QString content = editor->toPlainText();
+    IndentInfo currentIndent = detectFileIndentation(content);
+
+    bool sourceSpaces = currentIndent.detected ? currentIndent.usesSpaces : !editor->insertSpacesForTabs();
+    int sourceWidth = currentIndent.detected ? currentIndent.width : editor->tabWidth();
+    int targetWidth = editor->tabWidth();
+
+    QString converted = convertIndentation(content, true, targetWidth, sourceSpaces, sourceWidth);
+
+    editor->setPlainText(converted);
+    editor->setInsertSpacesForTabs(true);
+    editor->document()->setModified(true);
+}
+
+void MainWindow::convertToTabs() {
+    CodeEditor *editor = currentEditor();
+    if (!editor) return;
+
+    QString content = editor->toPlainText();
+    IndentInfo currentIndent = detectFileIndentation(content);
+
+    bool sourceSpaces = currentIndent.detected ? currentIndent.usesSpaces : !editor->insertSpacesForTabs();
+    int sourceWidth = currentIndent.detected ? currentIndent.width : editor->tabWidth();
+    int targetWidth = editor->tabWidth();
+
+    QString converted = convertIndentation(content, false, targetWidth, sourceSpaces, sourceWidth);
+
+    editor->setPlainText(converted);
+    editor->setInsertSpacesForTabs(false);
+    editor->document()->setModified(true);
 }

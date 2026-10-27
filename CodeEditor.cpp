@@ -4,6 +4,7 @@
 
 CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent) {
     lineNumberArea = new LineNumberArea(this);
+    setTabWidth(4);
 
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
@@ -145,4 +146,61 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
         bottom = top + qRound(blockBoundingGeometry(block).height());
         ++blockNumber;
     }
+}
+
+void CodeEditor::setTabWidth(int width) {
+    m_tabWidth = width;
+    QFontMetrics fm(font());
+    setTabStopDistance(fm.horizontalAdvance(' ') * m_tabWidth);
+}
+
+void CodeEditor::setInsertSpacesForTabs(bool enabled) {
+    m_insertSpaces = enabled;
+}
+
+void CodeEditor::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Tab && m_insertSpaces && !(event->modifiers() & Qt::ShiftModifier)) {
+        // Insert soft tabs (spaces)
+        QString spaces(m_tabWidth, ' ');
+        insertPlainText(spaces);
+        event->accept();
+        return;
+    }
+
+    // Auto-Indentation on Enter / Return
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        QTextCursor cursor = textCursor();
+        QString currentLine = cursor.block().text();
+
+        // Extract leading whitespace from the current line
+        QString indentation = "";
+        for (QChar c : currentLine) {
+            if (c == ' ' || c == '\t') {
+                indentation.append(c);
+            } else {
+                break;
+            }
+        }
+
+        // Smart indent: Add an extra indent level if line ends with ':' (Python/Go) or '{' (C++/Java/JS)
+        QString trimmed = currentLine.trimmed();
+        if (trimmed.endsWith(':') || trimmed.endsWith('{')) {
+            if (m_insertSpaces) {
+                indentation.append(QString(m_tabWidth, ' '));
+            } else {
+                indentation.append('\t');
+            }
+        }
+
+        // Let the default enter event execute first (creates the new line)
+        QPlainTextEdit::keyPressEvent(event);
+
+        // Insert the carried-over indentation onto the new line
+        if (!indentation.isEmpty()) {
+            insertPlainText(indentation);
+        }
+        return;
+    }
+
+    QPlainTextEdit::keyPressEvent(event);
 }

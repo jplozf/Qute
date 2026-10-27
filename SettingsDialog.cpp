@@ -5,11 +5,11 @@
 #include <QFontDialog>
 #include <QDialogButtonBox>
 
-SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, QWidget *parent)
-    : QDialog(parent), m_font(font), m_theme(theme)
+SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidth, bool insertSpaces, QWidget *parent)
+    : QDialog(parent), m_font(font), m_theme(theme), m_tabWidth(tabWidth), m_insertSpaces(insertSpaces)
 {
     setWindowTitle(tr("Preferences"));
-    resize(420, 200);
+    resize(440, 260);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -25,25 +25,27 @@ SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, QWidget *pa
 
     // Theme Setting Row
     themeComboBox = new QComboBox(this);
-    themeComboBox->addItems({
-        tr("Light"),
-        tr("Dark (VS Code)"),
-        tr("Monokai"),
-        tr("Solarized Dark"),
-        tr("Nord")
-    });
+    themeComboBox->addItems({tr("Light"), tr("Dark (VS Code)"), tr("Monokai"), tr("Solarized Dark"), tr("Nord")});
     themeComboBox->setCurrentIndex(static_cast<int>(m_theme));
     formLayout->addRow(tr("Syntax Theme:"), themeComboBox);
+
+    // Tab Width Row
+    tabWidthSpinBox = new QSpinBox(this);
+    tabWidthSpinBox->setRange(2, 8);
+    tabWidthSpinBox->setValue(m_tabWidth);
+    formLayout->addRow(tr("Tab Width (Spaces):"), tabWidthSpinBox);
+
+    // Insert Spaces Checkbox
+    insertSpacesCheckBox = new QCheckBox(tr("Insert spaces for tabs"), this);
+    insertSpacesCheckBox->setChecked(m_insertSpaces);
+    formLayout->addRow(QString(), insertSpacesCheckBox);
 
     mainLayout->addLayout(formLayout);
     mainLayout->addStretch();
 
-    // Dialog Buttons (OK / Cancel)
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(
-        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     mainLayout->addWidget(buttonBox);
 
-    // Connections
     connect(fontButton, &QPushButton::clicked, this, &SettingsDialog::changeFont);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -60,4 +62,12 @@ void SettingsDialog::changeFont() {
 
 EditorTheme SettingsDialog::getSelectedTheme() const {
     return static_cast<EditorTheme>(themeComboBox->currentIndex());
+}
+
+int SettingsDialog::getTabWidth() const {
+    return tabWidthSpinBox->value();
+}
+
+bool SettingsDialog::getInsertSpaces() const {
+    return insertSpacesCheckBox->isChecked();
 }

@@ -4,9 +4,15 @@
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
-    a.setWindowIcon(QIcon(":/icons/Qute_icon.png"));
-    MainWindow w;
+    QApplication app(argc, argv);
+    app.setWindowIcon(QIcon(":/icons/Qute_icon.png"));
+
+    // Get command line arguments (excluding the program path at index 0)
+    QStringList args = app.arguments();
+    args.removeFirst();
+
+    MainWindow w(args);
     w.show();
-    return QApplication::exec();
+
+    return app.exec();
 }
