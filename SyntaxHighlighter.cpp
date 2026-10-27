@@ -65,6 +65,24 @@ void SyntaxHighlighter::setupRules() {
             "\\bvoid\\b", "\\bwhile\\b", "\\bwith\\b", "\\byield\\b", "\\blet\\b", "\\bconst\\b"
         };
         break;
+    case ProgrammingLanguage::Java:
+        keywordPatterns = {
+            "\\babstract\\b", "\\bassert\\b", "\\bboolean\\b", "\\bbreak\\b", "\\byte\\b",
+            "\\bcase\\b", "\\bcatch\\b", "\\bchar\\b", "\\bclass\\b", "\\bconst\\b",
+            "\\bcontinue\\b", "\\bdefault\\b", "\\bdo\\b", "\\bdouble\\b", "\\belse\\b",
+            "\\benum\\b", "\\bextends\\b", "\\bfinal\\b", "\\bfinally\\b", "\\bfloat\\b",
+            "\\bfor\\b", "\\bgoto\\b", "\\bif\\b", "\\bimplements\\b", "\\bimport\\b",
+            "\\binstanceof\\b", "\\bint\\b", "\\binterface\\b", "\\blong\\b", "\\bnative\\b",
+            "\\bnew\\b", "\\bpackage\\b", "\\bprivate\\b", "\\bprotected\\b", "\\bpublic\\b",
+            "\\breturn\\b", "\\bshort\\b", "\\bstatic\\b", "\\bsuper\\b", "\\bswitch\\b",
+            "\\bthis\\b", "\\bthrow\\b", "\\bthrows\\b", "\\btry\\b", "\\bvoid\\b",
+            "\\bvolatile\\b", "\\bwhile\\b", "\\btrue\\b", "\\bfalse\\b", "\\bnull\\b"
+        };
+        break;
+    case ProgrammingLanguage::Html:
+    case ProgrammingLanguage::Xml:
+        // For HTML/XML, keywords are handled as markup tags
+        break;
     }
 
     for (const QString &pattern : keywordPatterns) {
@@ -73,29 +91,45 @@ void SyntaxHighlighter::setupRules() {
         highlightingRules.append(rule);
     }
 
-    // Comments (Python uses '#', C++/Go/JS use '//')
-    if (m_lang == ProgrammingLanguage::Python) {
-        rule.pattern = QRegularExpression("#[^\n]*");
+    // Special Rules for HTML / XML Tags and Comments
+    if (m_lang == ProgrammingLanguage::Html || m_lang == ProgrammingLanguage::Xml) {
+        // XML/HTML Tags (e.g. <div, </span, <root>)
+        rule.pattern = QRegularExpression("</?[a-zA-Z0-9_-]+");
+        rule.format = tagFormat;
+        highlightingRules.append(rule);
+
+        // Comments (<!-- ... -->)
+        rule.pattern = QRegularExpression("<!--[^>]*-->");
+        rule.format = singleLineCommentFormat;
+        highlightingRules.append(rule);
     } else {
-        rule.pattern = QRegularExpression("//[^\n]*");
+        // Standard Line Comments
+        if (m_lang == ProgrammingLanguage::Python) {
+            rule.pattern = QRegularExpression("#[^\n]*");
+        } else {
+            rule.pattern = QRegularExpression("//[^\n]*");
+        }
+        rule.format = singleLineCommentFormat;
+        highlightingRules.append(rule);
     }
-    rule.format = singleLineCommentFormat;
-    highlightingRules.append(rule);
 
     // Quotations / Strings
     rule.pattern = QRegularExpression("\".*?\"");
     rule.format = quotationFormat;
     highlightingRules.append(rule);
 
-    // Functions
-    rule.pattern = QRegularExpression("\\b[A-Za-z0-9_]+(?=\\()");
-    rule.format = functionFormat;
-    highlightingRules.append(rule);
+    // Functions (skip for HTML/XML)
+    if (m_lang != ProgrammingLanguage::Html && m_lang != ProgrammingLanguage::Xml) {
+        rule.pattern = QRegularExpression("\\b[A-Za-z0-9_]+(?=\\()");
+        rule.format = functionFormat;
+        highlightingRules.append(rule);
+    }
 }
 
 void SyntaxHighlighter::setTheme(EditorTheme theme) {
     m_theme = theme;
     keywordFormat.setFontWeight(QFont::Bold);
+    tagFormat.setFontWeight(QFont::Bold);
 
     switch (theme) {
     case EditorTheme::Light:
@@ -103,30 +137,35 @@ void SyntaxHighlighter::setTheme(EditorTheme theme) {
         singleLineCommentFormat.setForeground(Qt::darkGreen);
         quotationFormat.setForeground(Qt::darkRed);
         functionFormat.setForeground(Qt::blue);
+        tagFormat.setForeground(Qt::darkMagenta);
         break;
     case EditorTheme::DarkVS:
         keywordFormat.setForeground(QColor(86, 156, 214));
         singleLineCommentFormat.setForeground(QColor(106, 153, 85));
         quotationFormat.setForeground(QColor(214, 157, 133));
         functionFormat.setForeground(QColor(220, 220, 170));
+        tagFormat.setForeground(QColor(78, 201, 176));
         break;
     case EditorTheme::Monokai:
         keywordFormat.setForeground(QColor(249, 38, 114));
         singleLineCommentFormat.setForeground(QColor(117, 113, 94));
         quotationFormat.setForeground(QColor(230, 219, 116));
         functionFormat.setForeground(QColor(166, 226, 46));
+        tagFormat.setForeground(QColor(102, 217, 239));
         break;
     case EditorTheme::SolarizedDark:
         keywordFormat.setForeground(QColor(38, 139, 210));
         singleLineCommentFormat.setForeground(QColor(133, 153, 0));
         quotationFormat.setForeground(QColor(42, 161, 152));
         functionFormat.setForeground(QColor(181, 137, 0));
+        tagFormat.setForeground(QColor(203, 75, 22));
         break;
     case EditorTheme::Nord:
         keywordFormat.setForeground(QColor(129, 161, 193));
         singleLineCommentFormat.setForeground(QColor(97, 110, 136));
         quotationFormat.setForeground(QColor(163, 190, 140));
         functionFormat.setForeground(QColor(136, 192, 208));
+        tagFormat.setForeground(QColor(180, 142, 173));
         break;
     }
     setupRules();

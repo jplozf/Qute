@@ -16,7 +16,10 @@ enum class ProgrammingLanguage {
     Cpp,
     Python,
     Go,
-    JavaScript
+    JavaScript,
+    Java,
+    Html,
+    Xml
 };
 
 class SyntaxHighlighter : public QSyntaxHighlighter {
@@ -42,6 +45,7 @@ private:
     QTextCharFormat singleLineCommentFormat;
     QTextCharFormat quotationFormat;
     QTextCharFormat functionFormat;
+    QTextCharFormat tagFormat;
 
     EditorTheme m_theme = EditorTheme::Light;
     ProgrammingLanguage m_lang = ProgrammingLanguage::Cpp;

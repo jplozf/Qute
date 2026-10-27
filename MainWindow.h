@@ -25,6 +25,7 @@ private slots:
     void newFile();
     void openFile();
     void saveFile();
+    void saveAsFile();
     void closeCurrentTab();
     void closeTab(int index);
     void showFindDialog();
@@ -42,6 +43,10 @@ private slots:
 
     void openRecentFile();
 
+    void zoomIn();
+    void zoomOut();
+    void print();
+
 private:
     enum { MaxRecentFiles = 5 };
 
@@ -51,6 +56,7 @@ private:
     QLabel *versionLabel;
     QFont currentEditorFont;
     EditorTheme currentTheme;
+    QLabel *toolbarLangLabel;
 
     QMenu *recentFilesMenu;
     QAction *recentFileActions[MaxRecentFiles];
@@ -60,12 +66,16 @@ private:
     QAction *newAction;
     QAction *openAction;
     QAction *saveAction;
+    QAction *saveAsAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
     QAction *findAction;
     QAction *closeTabAction;
     QAction *settingsAction;
+    QAction *zoomInAction;
+    QAction *zoomOutAction;
+    QAction *printAction;
 
     void setupMenus();
     void setupToolBar();
@@ -76,6 +86,8 @@ private:
     void applySettingsToAllEditors();
     void updateRecentFileActions();
     void addToRecentFiles(const QString &fileName);
+    QString languageToString(ProgrammingLanguage lang);
 };
 
 ProgrammingLanguage detectLanguage(const QString &fileName);
+QString formatByteSize(qint64 bytes);

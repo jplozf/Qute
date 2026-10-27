@@ -13,6 +13,8 @@
 #include <QTextCursor>
 #include <QSettings>
 #include <QShortcut>
+#include <QPrintDialog>
+#include <QPrinter>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), tabWidget(new QTabWidget(this)), findDialog(nullptr), currentTheme(EditorTheme::Light)
@@ -135,9 +137,19 @@ void MainWindow::setupMenus() {
     saveAction->setIcon(QIcon(":/icons/Save.png"));
     connect(saveAction, &QAction::triggered, this, &MainWindow::saveFile);
 
+    saveAsAction = new QAction(tr("Save &As..."), this);
+    saveAsAction->setShortcut(QKeySequence::SaveAs);
+    saveAsAction->setIcon(QIcon(":/icons/Save.png"));
+    connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveAsFile);
+
     closeTabAction = new QAction(tr("&Close Tab"), this);
     closeTabAction->setShortcut(QKeySequence::Close);
     connect(closeTabAction, &QAction::triggered, this, &MainWindow::closeCurrentTab);
+
+    printAction = new QAction(tr("&Print..."), this);
+    printAction->setShortcut(QKeySequence::Print);
+    printAction->setIcon(QIcon(":/icons/Printer.png"));
+    connect(printAction, &QAction::triggered, this, &MainWindow::print);
 
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(newAction);
@@ -150,6 +162,8 @@ void MainWindow::setupMenus() {
     }
 
     fileMenu->addAction(saveAction);
+    fileMenu->addAction(saveAsAction);
+    fileMenu->addAction(printAction);
     fileMenu->addSeparator();
     fileMenu->addAction(closeTabAction);
     fileMenu->addSeparator();
@@ -180,12 +194,51 @@ void MainWindow::setupMenus() {
     editMenu->addSeparator();
     editMenu->addAction(findAction);
 
+    // View Menu Actions (Zoom In / Zoom Out)
+    zoomInAction = new QAction(tr("Zoom &In"), this);
+    zoomInAction->setShortcut(QKeySequence::ZoomIn);
+    zoomInAction->setIcon(QIcon(":/icons/Zoom In.png"));
+    connect(zoomInAction, &QAction::triggered, this, &MainWindow::zoomIn);
+
+    zoomOutAction = new QAction(tr("Zoom &Out"), this);
+    zoomOutAction->setShortcut(QKeySequence::ZoomOut);
+    zoomOutAction->setIcon(QIcon(":/icons/Zoom Out.png"));
+    connect(zoomOutAction, &QAction::triggered, this, &MainWindow::zoomOut);
+
+    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+    viewMenu->addAction(zoomInAction);
+    viewMenu->addAction(zoomOutAction);
+
     // Settings Menu
     QMenu *settingsMenu = menuBar()->addMenu(tr("&Settings"));
     settingsAction = new QAction(tr("&Preferences ..."), this);
     settingsAction->setIcon(QIcon(":/icons/Gear.png"));
     connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
     settingsMenu->addAction(settingsAction);
+}
+
+void MainWindow::zoomIn() {
+    if (CodeEditor *editor = currentEditor()) {
+        editor->zoomIn(1);
+    }
+}
+
+void MainWindow::zoomOut() {
+    if (CodeEditor *editor = currentEditor()) {
+        editor->zoomOut(1);
+    }
+}
+
+void MainWindow::print() {
+    CodeEditor *editor = currentEditor();
+    if (!editor)
+        return;
+
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() == QDialog::Accepted) {
+        editor->print(&printer);
+    }
 }
 
 void MainWindow::openSettings() {
@@ -205,10 +258,25 @@ void MainWindow::setupToolBar() {
     toolBar->addAction(newAction);
     toolBar->addAction(openAction);
     toolBar->addAction(saveAction);
+    toolBar->addAction(saveAsAction);
+    toolBar->addAction(printAction);
     toolBar->addSeparator();
     toolBar->addAction(findAction);
     toolBar->addSeparator();
+    toolBar->addAction(zoomInAction);
+    toolBar->addAction(zoomOutAction);
+    toolBar->addSeparator();
     toolBar->addAction(settingsAction);
+
+    // --- Create an expanding spacer to push items to the right ---
+    QWidget *spacer = new QWidget(this);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    toolBar->addWidget(spacer);
+
+    // Create and embed the QLabel into the toolbar
+    toolbarLangLabel = new QLabel(tr(" Language: C++ "), this);
+    toolbarLangLabel->setStyleSheet("color: gray; font-weight: bold; padding: 0 4px;");
+    toolBar->addWidget(toolbarLangLabel);
 }
 
 void MainWindow::addToRecentFiles(const QString &fileName) {
@@ -302,14 +370,43 @@ void MainWindow::updateCursorPosition() {
         statusLabel->clear();
         return;
     }
+    // Calculate file size and human-readable size
+    QString text = editor->toPlainText();
+    qint64 byteSize = text.toUtf8().size();
+    QString humanSize = formatByteSize(byteSize);
+
+    // Get cursor and line information
     QTextCursor cursor = editor->textCursor();
     int line = cursor.blockNumber() + 1;
     int col = cursor.columnNumber() + 1;
-    statusLabel->setText(QString("Ln: %1, Col: %2").arg(line).arg(col));
+    int totalLines = editor->document()->blockCount();
+
+    // Calculate percentage through the file based on lines
+    int percentage = 0;
+    if (totalLines > 0) {
+        percentage = (line * 100) / totalLines;
+        if (percentage > 100) percentage = 100;
+    }
+
+    // Format status bar text cleanly
+    statusLabel->setText(QString("Size: %1 (%2 bytes)  |  %3%  |  Ln: %4, Col: %5")
+                             .arg(humanSize)
+                             .arg(byteSize)
+                             .arg(percentage)
+                             .arg(line)
+                             .arg(col));
 }
 
 void MainWindow::currentTabChanged(int /* index */) {
     updateCursorPosition();
+    CodeEditor *editor = currentEditor();
+    if (editor) {
+        if (SyntaxHighlighter *hl = editor->document()->findChild<SyntaxHighlighter*>()) {
+            toolbarLangLabel->setText(QString(" Language: %1 ").arg(languageToString(hl->language())));
+        }
+    } else {
+        toolbarLangLabel->setText(tr(" Language: None "));
+    }
 }
 
 void MainWindow::documentModified(bool modified) {
@@ -441,6 +538,32 @@ void MainWindow::saveFile() {
     addToRecentFiles(filePath);
 }
 
+void MainWindow::saveAsFile() {
+    CodeEditor *editor = currentEditor();
+    if (!editor)
+        return;
+
+    QString filePath = QFileDialog::getSaveFileName(this, tr("Save File As"));
+    if (filePath.isEmpty())
+        return;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Error"), tr("Cannot write file %1:\n%2.").arg(filePath, file.errorString()));
+        return;
+    }
+
+    QTextStream out(&file);
+    out << editor->toPlainText();
+    editor->document()->setModified(false);
+
+    int index = tabWidget->currentIndex();
+    tabWidget->setTabText(index, strippedName(filePath));
+    tabWidget->setTabToolTip(index, filePath);
+
+    addToRecentFiles(filePath);
+}
+
 bool MainWindow::maybeSave(CodeEditor *editor) {
     if (!editor->document()->isModified())
         return true;
@@ -487,6 +610,19 @@ void MainWindow::closeTab(int index) {
     }
 }
 
+QString MainWindow::languageToString(ProgrammingLanguage lang) {
+    switch (lang) {
+    case ProgrammingLanguage::Cpp: return "C++";
+    case ProgrammingLanguage::Python: return "Python";
+    case ProgrammingLanguage::Go: return "Go";
+    case ProgrammingLanguage::JavaScript: return "JavaScript";
+    case ProgrammingLanguage::Java: return "Java";
+    case ProgrammingLanguage::Html: return "HTML";
+    case ProgrammingLanguage::Xml: return "XML";
+    }
+    return "Unknown";
+}
+
 ProgrammingLanguage detectLanguage(const QString &fileName) {
     if (fileName.endsWith(".py", Qt::CaseInsensitive))
         return ProgrammingLanguage::Python;
@@ -494,7 +630,21 @@ ProgrammingLanguage detectLanguage(const QString &fileName) {
         return ProgrammingLanguage::Go;
     if (fileName.endsWith(".js", Qt::CaseInsensitive) || fileName.endsWith(".ts", Qt::CaseInsensitive))
         return ProgrammingLanguage::JavaScript;
+    if (fileName.endsWith(".java", Qt::CaseInsensitive))
+        return ProgrammingLanguage::Java;
+    if (fileName.endsWith(".html", Qt::CaseInsensitive) || fileName.endsWith(".htm", Qt::CaseInsensitive))
+        return ProgrammingLanguage::Html;
+    if (fileName.endsWith(".xml", Qt::CaseInsensitive) || fileName.endsWith(".svg", Qt::CaseInsensitive))
+        return ProgrammingLanguage::Xml;
 
-    // Default to C++ for .cpp, .h, .c, .cc, or unknown extensions
-    return ProgrammingLanguage::Cpp;
+    return ProgrammingLanguage::Cpp; // Default
+}
+
+QString formatByteSize(qint64 bytes) {
+    if (bytes < 1024)
+        return QString("%1 B").arg(bytes);
+    else if (bytes < 1024 * 1024)
+        return QString("%1 KB").arg(QString::number(bytes / 1024.0, 'f', 1));
+    else
+        return QString("%1 MB").arg(QString::number(bytes / (1024.0 * 1024.0), 'f', 1));
 }

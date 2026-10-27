@@ -4,7 +4,7 @@ project(Qute VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets PrintSupport)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -51,7 +51,7 @@ add_executable(Qute
     commit_message.txt
 )
 
-target_link_libraries(Qute PRIVATE Qt6::Widgets)
+target_link_libraries(Qute PRIVATE Qt6::Widgets Qt6::PrintSupport)
 
 # --- 3. Inject Preprocessor Macros with String Quoting ---
 target_compile_definitions(Qute PRIVATE
