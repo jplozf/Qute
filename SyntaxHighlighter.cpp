@@ -79,6 +79,15 @@ void SyntaxHighlighter::setupRules() {
             "\\bvolatile\\b", "\\bwhile\\b", "\\btrue\\b", "\\bfalse\\b", "\\bnull\\b"
         };
         break;
+    case ProgrammingLanguage::Bash:
+        keywordPatterns = {
+            "\\bif\\b", "\\bthen\\b", "\\belse\\b", "\\bif\\b", "\\elif\\b",
+            "\\bfi\\b", "\\bcase\\b", "\\besac\\b", "\\bfor\\b", "\\bselect\\b",
+            "\\bwhile\\b", "\\buntil\\b", "\\bdo\\b", "\\bdone\\b", "\\bin\\b",
+            "\\bfunction\\b", "\\btime\\b", "\\breturn\\b", "\\bexit\\b", "\\blocal\\b",
+            "\\bdeclare\\b"
+        };
+        break;
     case ProgrammingLanguage::Html:
     case ProgrammingLanguage::Xml:
         // For HTML/XML, keywords are handled as markup tags
@@ -108,6 +117,9 @@ void SyntaxHighlighter::setupRules() {
             rule.pattern = QRegularExpression("#[^\n]*");
         } else {
             rule.pattern = QRegularExpression("//[^\n]*");
+        }
+        if (m_lang == ProgrammingLanguage::Bash) {
+            rule.pattern = QRegularExpression("#[^\n]*");
         }
         rule.format = singleLineCommentFormat;
         highlightingRules.append(rule);
@@ -179,5 +191,5 @@ void SyntaxHighlighter::highlightBlock(const QString &text) {
             QRegularExpressionMatch match = matchIterator.next();
             setFormat(match.capturedStart(), match.capturedLength(), rule.format);
         }
-    }
+    }    
 }

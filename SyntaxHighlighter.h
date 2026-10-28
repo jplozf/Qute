@@ -19,7 +19,8 @@ enum class ProgrammingLanguage {
     JavaScript,
     Java,
     Html,
-    Xml
+    Xml,
+    Bash
 };
 
 class SyntaxHighlighter : public QSyntaxHighlighter {

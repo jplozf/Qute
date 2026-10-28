@@ -761,25 +761,26 @@ QString MainWindow::languageToString(ProgrammingLanguage lang) {
     case ProgrammingLanguage::Java: return "Java";
     case ProgrammingLanguage::Html: return "HTML";
     case ProgrammingLanguage::Xml: return "XML";
+    case ProgrammingLanguage::Bash: return "Bash";
     }
     return "Unknown";
 }
 
 ProgrammingLanguage detectLanguage(const QString &fileName) {
-    if (fileName.endsWith(".py", Qt::CaseInsensitive))
-        return ProgrammingLanguage::Python;
-    if (fileName.endsWith(".go", Qt::CaseInsensitive))
-        return ProgrammingLanguage::Go;
-    if (fileName.endsWith(".js", Qt::CaseInsensitive) || fileName.endsWith(".ts", Qt::CaseInsensitive))
-        return ProgrammingLanguage::JavaScript;
-    if (fileName.endsWith(".java", Qt::CaseInsensitive))
-        return ProgrammingLanguage::Java;
-    if (fileName.endsWith(".html", Qt::CaseInsensitive) || fileName.endsWith(".htm", Qt::CaseInsensitive))
-        return ProgrammingLanguage::Html;
-    if (fileName.endsWith(".xml", Qt::CaseInsensitive) || fileName.endsWith(".svg", Qt::CaseInsensitive))
-        return ProgrammingLanguage::Xml;
+    QFileInfo fileInfo(fileName);
+    QString ext = fileInfo.suffix().toLower();
+    QString name = fileInfo.fileName().toLower();
 
-    return ProgrammingLanguage::Cpp; // Default
+    if (ext == "cpp" || ext == "cc" || ext == "h") return ProgrammingLanguage::Cpp;
+    if (ext == "py") return ProgrammingLanguage::Python;
+    if (ext == "go") return ProgrammingLanguage::Go;
+    if (ext == "js") return ProgrammingLanguage::JavaScript;
+    if (ext == "java") return ProgrammingLanguage::Java;
+    if (ext == "html" || ext == "htm") return ProgrammingLanguage::Html;
+    if (ext == "xml") return ProgrammingLanguage::Xml;
+    if (ext == "sh" || ext == "bash" || name.startsWith("env")) return ProgrammingLanguage::Bash;
+
+    return ProgrammingLanguage::Cpp; // Default fallback
 }
 
 QString formatByteSize(qint64 bytes) {
@@ -805,6 +806,10 @@ void MainWindow::applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lan
     case ProgrammingLanguage::Xml:
         editor->setInsertSpacesForTabs(true);
         editor->setTabWidth(2); // Common web/markup convention
+        break;
+    case ProgrammingLanguage::Bash:
+        editor->setInsertSpacesForTabs(false);
+        editor->setTabWidth(4);
         break;
     default:
         // Fall back to user's global preferences for C++, JS, Java, etc.
