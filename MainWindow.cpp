@@ -106,19 +106,33 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
             openFileWithPath(absPath); // Opens existing files or creates a new buffer if it doesn't exist yet
         }
     } else {
-        QStringList openFiles = settings.value("openFiles").toStringList();
-        int currentIndex = settings.value("currentIndex", 0).toInt();
+        int size = settings.beginReadArray("OpenFiles");
+        for (int i = 0; i < size; ++i) {
+            settings.setArrayIndex(i);
+            QString filePath = settings.value("filePath").toString();
+            int langInt = settings.value("language", static_cast<int>(ProgrammingLanguage::Cpp)).toInt();
 
-        if (!openFiles.isEmpty()) {
-            for (const QString &file : openFiles) {
-                if (QFile::exists(file)) {
-                    openFileWithPath(file);
+            if (!filePath.isEmpty() && QFile::exists(filePath)) {
+                // Open your file (which creates the editor tab)
+                openFileWithPath(filePath);
+
+                // Get the newly created editor and apply the saved language
+                CodeEditor *editor = currentEditor();
+                if (editor) {
+                    ProgrammingLanguage lang = static_cast<ProgrammingLanguage>(langInt);
+                    editor->setLanguage(lang);
+
+                    // Update highlighter
+                    SyntaxHighlighter *hl = editor->findChild<SyntaxHighlighter*>();
+                    if (hl) {
+                        hl->setLanguage(lang);
+                        hl->rehighlight();
+                    }
+                    currentTabChanged(0); // to refresh the Language label
                 }
             }
-            if (tabWidget->count() > 0) {
-                tabWidget->setCurrentIndex(qMin(currentIndex, tabWidget->count() - 1));
-            }
         }
+        settings.endArray();
     }
 
     if (tabWidget->count() == 0) {
@@ -146,15 +160,20 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     settings.setValue("tabWidth", currentTabWidth);
     settings.setValue("insertSpaces", currentInsertSpaces);
 
-    QStringList openFiles;
+    settings.beginWriteArray("OpenFiles");
     for (int i = 0; i < tabWidget->count(); ++i) {
         CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
-        QString filePath = tabWidget->tabToolTip(i);
-        if (!filePath.isEmpty() && QFile::exists(filePath)) {
-            openFiles.append(filePath);
-        }
+        if (!editor) continue;
+
+        QString filePath = editor->property("filePath").toString();
+        // Skip untitled/unsaved new tabs if you don't persist them
+        if (filePath.isEmpty()) continue;
+
+        settings.setArrayIndex(i);
+        settings.setValue("filePath", filePath);
+        settings.setValue("language", static_cast<int>(editor->language())); // Save language enum as int
     }
-    settings.setValue("openFiles", openFiles);
+    settings.endArray();
     settings.setValue("currentIndex", tabWidget->currentIndex());
 
     event->accept();
@@ -243,6 +262,44 @@ void MainWindow::setupMenus() {
     QMenu *indentMenu = editMenu->addMenu(tr("&Indentation"));
     indentMenu->addAction(convertToSpacesAction);
     indentMenu->addAction(convertToTabsAction);
+
+    QMenu *languageMenu = menuBar()->addMenu(tr("&Language"));
+
+    // Create action group so only one language is checked at a time
+    QActionGroup *langGroup = new QActionGroup(this);
+    langGroup->setExclusive(true);
+
+    auto addLangAction = [&](const QString &name, ProgrammingLanguage lang) {
+        QAction *action = new QAction(name, this);
+        action->setCheckable(true);
+        langGroup->addAction(action);
+        languageMenu->addAction(action);
+
+        connect(action, &QAction::triggered, this, [this, lang]() {
+            CodeEditor *editor = currentEditor();
+            if (!editor) return;
+
+            editor->setLanguage(lang);
+
+            // Re-apply highlighter with the new language
+            SyntaxHighlighter *hl = editor->findChild<SyntaxHighlighter*>();
+            if (hl) {
+                hl->setLanguage(lang);
+                hl->rehighlight();
+            }
+
+            currentTabChanged(0); // just to refresh the language label
+        });
+    };
+
+    addLangAction(tr("C / C++"), ProgrammingLanguage::Cpp);
+    addLangAction(tr("Python"), ProgrammingLanguage::Python);
+    addLangAction(tr("Go"), ProgrammingLanguage::Go);
+    addLangAction(tr("Bash"), ProgrammingLanguage::Bash);
+    addLangAction(tr("JavaScript"), ProgrammingLanguage::JavaScript);
+    addLangAction(tr("Java"), ProgrammingLanguage::Java);
+    addLangAction(tr("HTML"), ProgrammingLanguage::Html);
+    addLangAction(tr("XML"), ProgrammingLanguage::Xml);
 
     // View Menu Actions (Zoom In / Zoom Out)
     zoomInAction = new QAction(tr("Zoom &In"), this);
@@ -633,6 +690,7 @@ void MainWindow::openFileWithPath(const QString &fileName) {
     }
 
     editor->setPlainText(content);
+    editor->setProperty("filePath",fileName);
 
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
     hl->setLanguage(detectLanguage(fileName));
@@ -697,6 +755,7 @@ void MainWindow::saveAsFile() {
     QTextStream out(&file);
     out << editor->toPlainText();
     editor->document()->setModified(false);
+    editor->setProperty("filePath", filePath);
 
     int index = tabWidget->currentIndex();
     tabWidget->setTabText(index, strippedName(filePath));
@@ -947,3 +1006,42 @@ void MainWindow::showAboutMessage() {
     msgBox.setStandardButtons(QMessageBox::Ok);
     msgBox.exec();
 }
+
+/*
+void MainWindow::updateLanguageLabel() {
+    if (!langLabel) return;
+
+    CodeEditor *editor = currentEditor();
+    if (!editor) {
+        langLabel->setText(tr("None"));
+        return;
+    }
+
+    switch (editor->language()) {
+    case ProgrammingLanguage::Cpp:
+        langLabel->setText("C++");
+        break;
+    case ProgrammingLanguage::Python:
+        langLabel->setText("Python");
+        break;
+    case ProgrammingLanguage::Go:
+        langLabel->setText("Go");
+        break;
+    case ProgrammingLanguage::Bash:
+        langLabel->setText("Bash");
+        break;
+    case ProgrammingLanguage::JavaScript:
+        langLabel->setText("JavaScript");
+        break;
+    case ProgrammingLanguage::Java:
+        langLabel->setText("Java");
+        break;
+    case ProgrammingLanguage::Html:
+        langLabel->setText("HTML");
+        break;
+    case ProgrammingLanguage::Xml:
+        langLabel->setText("XML");
+        break;
+    }
+}
+*/

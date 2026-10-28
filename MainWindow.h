@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QCloseEvent>
 #include <QAction>
+#include <QActionGroup>
 #include <QMenu>
 #include <QToolBar>
 #include <QMessageBox>

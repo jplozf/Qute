@@ -18,6 +18,8 @@ public:
     void setInsertSpacesForTabs(bool enabled);
     int tabWidth() const { return m_tabWidth; }
     bool insertSpacesForTabs() const { return m_insertSpaces; }
+    void setLanguage(ProgrammingLanguage lang) { m_language = lang; }
+    ProgrammingLanguage language() const { return m_language; }
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -33,6 +35,7 @@ private:
     EditorTheme m_theme = EditorTheme::Light;
     int m_tabWidth = 4;
     bool m_insertSpaces = true;
+    ProgrammingLanguage m_language = ProgrammingLanguage::Cpp;
 };
 
 class LineNumberArea : public QWidget {
