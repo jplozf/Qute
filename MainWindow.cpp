@@ -349,7 +349,11 @@ void MainWindow::setupToolBar() {
                             .arg(APP_VERSION)
                             .arg(GIT_COMMIT_COUNT)
                             .arg(GIT_HASH);
-    toolbarVersionLabel = new QLabel(aboutText, this);
+    toolbarVersionLabel = new DoubleClickLabel(this);
+    toolbarVersionLabel->setText(aboutText);
+    connect(toolbarVersionLabel, &DoubleClickLabel::doubleClicked, this, [this]() {
+        showAboutMessage();
+    });
     toolbarVersionLabel->setStyleSheet("color: gray; padding: 0 4px;");
     toolBar->addWidget(toolbarVersionLabel);
 }
@@ -918,4 +922,23 @@ void MainWindow::convertToTabs() {
     editor->setPlainText(converted);
     editor->setInsertSpacesForTabs(false);
     editor->document()->setModified(true);
+}
+
+void MainWindow::showAboutMessage() {
+    QMessageBox msgBox(this);
+    QString aboutText = QString("%1 v%2.%3-%4")
+                            .arg(appConstants->getQString("APPLICATION_NAME"))
+                            .arg(APP_VERSION)
+                            .arg(GIT_COMMIT_COUNT)
+                            .arg(GIT_HASH);
+    msgBox.setWindowTitle("About " + appConstants->getQString("APPLICATION_NAME"));
+    msgBox.setText(aboutText + "\n\n" + appConstants->getQString("COPYRIGHT") + "\n\n" + appConstants->getQString("EMAIL"));
+
+    QPixmap customIcon(":/icons/Qute_icon.png");
+    if (!customIcon.isNull()) {
+        msgBox.setIconPixmap(customIcon.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.exec();
 }

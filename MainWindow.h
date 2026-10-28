@@ -13,6 +13,21 @@
 #include "constants.h"
 #include "SettingsDialog.h"
 
+class DoubleClickLabel : public QLabel {
+    Q_OBJECT
+public:
+    explicit DoubleClickLabel(QWidget *parent = nullptr) : QLabel(parent) {}
+
+signals:
+    void doubleClicked();
+
+protected:
+    void mouseDoubleClickEvent(QMouseEvent *event) override {
+        emit doubleClicked();
+        QLabel::mouseDoubleClickEvent(event); // Call base implementation
+    }
+};
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -60,7 +75,7 @@ private:
     FindReplaceDialog *findDialog;
     QFont currentEditorFont;
     EditorTheme currentTheme;
-    QLabel *toolbarVersionLabel;
+    DoubleClickLabel *toolbarVersionLabel;
     QLabel *langLabel;
     QLabel *sizeLabel;
     QLabel *modifiedLabel;
@@ -100,6 +115,7 @@ private:
     void addToRecentFiles(const QString &fileName);
     QString languageToString(ProgrammingLanguage lang);
     void applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lang);
+    void showAboutMessage();
 };
 
 struct IndentInfo {
@@ -112,3 +128,4 @@ ProgrammingLanguage detectLanguage(const QString &fileName);
 QString formatByteSize(qint64 bytes);
 IndentInfo detectFileIndentation(const QString &content);
 QString convertIndentation(const QString &content, bool targetSpaces, int targetWidth, bool sourceSpaces, int sourceWidth);
+
