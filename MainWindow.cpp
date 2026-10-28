@@ -28,17 +28,40 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     connect(tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
     connect(tabWidget, &QTabWidget::currentChanged, this, &MainWindow::currentTabChanged);
 
-    // Setup Status Bar
-    QString aboutText = QString("Version : %1.%2-%3")
-                            .arg(APP_VERSION)
-                            .arg(GIT_COMMIT_COUNT)
-                            .arg(GIT_HASH);
-    versionLabel = new QLabel(aboutText, this);
-    versionLabel->setStyleSheet("color: gray;"); // Optional: subtle styling
-    statusBar()->addWidget(versionLabel);       // Left side of the status bar
 
-    statusLabel = new QLabel(this);
-    statusBar()->addPermanentWidget(statusLabel); // Right side (Cursor position)
+    // Status Bar & Version Setup
+    langLabel = new QLabel(QString("Unknown"), this);
+    langLabel->setStyleSheet("color: gray;");
+    statusBar()->addWidget(langLabel);
+
+    // Create individual status widgets with fixed/minimum widths and panel borders
+    sizeLabel = new QLabel(this);
+    sizeLabel->setMinimumWidth(160);
+    sizeLabel->setAlignment(Qt::AlignCenter);
+
+    modifiedLabel = new QLabel(this);
+    modifiedLabel->setMinimumWidth(90);
+    modifiedLabel->setAlignment(Qt::AlignCenter);
+    modifiedLabel->setStyleSheet("color: #d9534f; font-weight: bold;");
+
+    progressLabel = new QLabel(this);
+    progressLabel->setMinimumWidth(55);
+    progressLabel->setAlignment(Qt::AlignCenter);
+
+    tabPolicyLabel = new QLabel(this);
+    tabPolicyLabel->setMinimumWidth(110);
+    tabPolicyLabel->setAlignment(Qt::AlignCenter);
+
+    cursorPosLabel = new QLabel(this);
+    cursorPosLabel->setMinimumWidth(110);
+    cursorPosLabel->setAlignment(Qt::AlignCenter);
+
+    // Add them as permanent widgets on the right side of the status bar
+    statusBar()->addPermanentWidget(sizeLabel);
+    statusBar()->addPermanentWidget(modifiedLabel);
+    statusBar()->addPermanentWidget(progressLabel);
+    statusBar()->addPermanentWidget(tabPolicyLabel);
+    statusBar()->addPermanentWidget(cursorPosLabel);
 
     setupMenus();
     setupToolBar();
@@ -309,10 +332,26 @@ void MainWindow::setupToolBar() {
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolBar->addWidget(spacer);
 
+    QLabel *logoLabel = new QLabel(this);
+    QPixmap logoPix(":/icons/Qute_icon.png");
+    if (!logoPix.isNull()) {
+        // Scale it nicely to fit the toolbar height
+        logoLabel->setPixmap(logoPix.scaled(24, 24, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        // Fallback if icon isn't found yet
+        logoLabel->setText("⚡");
+    }
+    toolBar->addWidget(logoLabel);
+
     // Create and embed the QLabel into the toolbar
-    toolbarLangLabel = new QLabel(tr(" Language: C++ "), this);
-    toolbarLangLabel->setStyleSheet("color: gray; font-weight: bold; padding: 0 4px;");
-    toolBar->addWidget(toolbarLangLabel);
+    // Setup Status Bar
+    QString aboutText = QString("v%1.%2-%3")
+                            .arg(APP_VERSION)
+                            .arg(GIT_COMMIT_COUNT)
+                            .arg(GIT_HASH);
+    toolbarVersionLabel = new QLabel(aboutText, this);
+    toolbarVersionLabel->setStyleSheet("color: gray; padding: 0 4px;");
+    toolBar->addWidget(toolbarVersionLabel);
 }
 
 void MainWindow::addToRecentFiles(const QString &fileName) {
@@ -405,41 +444,48 @@ void MainWindow::showFindDialog() {
 void MainWindow::updateCursorPosition() {
     CodeEditor *editor = currentEditor();
     if (!editor) {
-        statusLabel->clear();
+        sizeLabel->clear();
+        modifiedLabel->clear();
+        progressLabel->clear();
+        tabPolicyLabel->clear();
+        cursorPosLabel->clear();
         return;
     }
 
-    // Calculate file size and human-readable size
+    // 1. File size metrics
     QString text = editor->toPlainText();
     qint64 byteSize = text.toUtf8().size();
     QString humanSize = formatByteSize(byteSize);
+    sizeLabel->setText(QString(" Size: %1 (%2 bytes) ").arg(humanSize).arg(byteSize));
 
-    // Get cursor and line information
+    // 2. Modified flag
+    if (editor->document()->isModified()) {
+        modifiedLabel->setText("*modified*");
+    } else {
+        modifiedLabel->clear();
+    }
+
+    // 3. Cursor & Line metrics
     QTextCursor cursor = editor->textCursor();
     int line = cursor.blockNumber() + 1;
     int col = cursor.columnNumber() + 1;
     int totalLines = editor->document()->blockCount();
 
-    // Calculate percentage through the file based on lines
     int percentage = 0;
     if (totalLines > 0) {
         percentage = (line * 100) / totalLines;
         if (percentage > 100) percentage = 100;
     }
+    progressLabel->setText(QString("%1%").arg(percentage));
 
-    // Format Tab Policy string (e.g., "Spaces: 4" or "Tabs: 4")
+    // 4. Tab policy
     QString tabPolicy = editor->insertSpacesForTabs()
                             ? QString("Spaces: %1").arg(editor->tabWidth())
                             : QString("Tab: %1").arg(editor->tabWidth());
+    tabPolicyLabel->setText(tabPolicy);
 
-    // Format status bar text cleanly with the tab policy included
-    statusLabel->setText(QString("Size: %1 (%2 bytes)  |  %3%  |  %4  |  Ln: %5, Col: %6")
-                             .arg(humanSize)
-                             .arg(byteSize)
-                             .arg(percentage)
-                             .arg(tabPolicy)
-                             .arg(line)
-                             .arg(col));
+    // 5. Line and Column coordinates
+    cursorPosLabel->setText(QString("Ln: %1, Col: %2 ").arg(line).arg(col));
 }
 
 void MainWindow::currentTabChanged(int /* index */) {
@@ -447,23 +493,36 @@ void MainWindow::currentTabChanged(int /* index */) {
     CodeEditor *editor = currentEditor();
     if (editor) {
         if (SyntaxHighlighter *hl = editor->document()->findChild<SyntaxHighlighter*>()) {
-            toolbarLangLabel->setText(QString(" Language: %1 ").arg(languageToString(hl->language())));
+            langLabel->setText(QString(" %1 ").arg(languageToString(hl->language())));
         }
     } else {
-        toolbarLangLabel->setText(tr(" Language: None "));
+        langLabel->setText(tr(" Unknown "));
     }
 }
 
 void MainWindow::documentModified(bool modified) {
-    if (CodeEditor *editor = qobject_cast<CodeEditor*>(sender())) {
-        int index = tabWidget->indexOf(editor);
-        if (index != -1) {
-            QString title = tabWidget->tabText(index);
-            if (modified && !title.endsWith("*")) {
-                tabWidget->setTabText(index, title + "*");
-            } else if (!modified && title.endsWith("*")) {
-                title.chop(1);
-                tabWidget->setTabText(index, title);
+    if (QTextDocument *doc = qobject_cast<QTextDocument*>(sender())) {
+        // Find which CodeEditor owns this document
+        for (int i = 0; i < tabWidget->count(); ++i) {
+            if (CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i))) {
+                if (editor->document() == doc) {
+                    QString title = tabWidget->tabText(i);
+                    // Remove any trailing spaces or existing stars to get clean base name
+                    title = title.trimmed();
+                    if (title.endsWith('*')) {
+                        title.chop(1);
+                        title = title.trimmed();
+                    }
+
+                    if (modified) {
+                        tabWidget->setTabText(i, title + " *");
+                        modifiedLabel->setText("*modified*");
+                    } else {
+                        tabWidget->setTabText(i, title);
+                        modifiedLabel->clear();
+                    }
+                    break;
+                }
             }
         }
     }
@@ -613,6 +672,7 @@ void MainWindow::saveFile() {
     tabWidget->setTabToolTip(index, filePath);
 
     addToRecentFiles(filePath);
+    updateCursorPosition();
 }
 
 void MainWindow::saveAsFile() {
@@ -639,6 +699,7 @@ void MainWindow::saveAsFile() {
     tabWidget->setTabToolTip(index, filePath);
 
     addToRecentFiles(filePath);
+    updateCursorPosition();
 }
 
 bool MainWindow::maybeSave(CodeEditor *editor) {

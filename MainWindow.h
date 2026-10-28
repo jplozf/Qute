@@ -58,11 +58,15 @@ private:
 
     QTabWidget *tabWidget;
     FindReplaceDialog *findDialog;
-    QLabel *statusLabel;
-    QLabel *versionLabel;
     QFont currentEditorFont;
     EditorTheme currentTheme;
-    QLabel *toolbarLangLabel;
+    QLabel *toolbarVersionLabel;
+    QLabel *langLabel;
+    QLabel *sizeLabel;
+    QLabel *modifiedLabel;
+    QLabel *progressLabel;
+    QLabel *tabPolicyLabel;
+    QLabel *cursorPosLabel;
 
     QMenu *recentFilesMenu;
     QAction *recentFileActions[MaxRecentFiles];
