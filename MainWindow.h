@@ -9,6 +9,9 @@
 #include <QMenu>
 #include <QToolBar>
 #include <QMessageBox>
+#include <QApplication>
+#include <QClipboard>
+#include <QTimer>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"

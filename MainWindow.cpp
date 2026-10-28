@@ -28,6 +28,71 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     connect(tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
     connect(tabWidget, &QTabWidget::currentChanged, this, &MainWindow::currentTabChanged);
 
+    // Contextual menu for tabs
+    QTabBar *tabBar = tabWidget->tabBar();
+    tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tabBar, &QTabBar::customContextMenuRequested, this, [this, tabBar](const QPoint &pos) {
+        // Find which tab was right-clicked based on local coordinates
+        int index = tabBar->tabAt(pos);
+
+        QMenu tabMenu(this);
+        QAction *closeAction = tabMenu.addAction(tr("Close Tab"));
+        QAction *closeOthersAction = tabMenu.addAction(tr("Close Other Tabs"));
+        QAction *copyPathAction = tabMenu.addAction(tr("Copy File Path"));
+        tabMenu.addSeparator();
+        QAction *closeAllAction = tabMenu.addAction(tr("Close All Tabs"));
+
+        // Execute menu at cursor position
+        QAction *selectedAction = tabMenu.exec(QCursor::pos());
+        if (!selectedAction) return;
+
+        // Capture the target widget pointer safely before the event loop ends
+        QWidget *targetWidget = tabWidget->widget(index);
+
+        // Defer execution slightly to let the menu event loop fully exit first
+        QTimer::singleShot(0, this, [this, targetWidget, selectedAction, closeAction, closeOthersAction, copyPathAction, closeAllAction]() {
+            if (selectedAction == closeAction) {
+                int idx = tabWidget->indexOf(targetWidget);
+                if (idx != -1) {
+                    closeTab(idx);
+                }
+            }
+            else if (selectedAction == closeOthersAction) {
+                // Close all tabs except the target, iterating backwards safely
+                for (int i = tabWidget->count() - 1; i >= 0; --i) {
+                    QWidget *w = tabWidget->widget(i);
+                    if (w != targetWidget) {
+                        int idx = tabWidget->indexOf(w);
+                        if (idx != -1) {
+                            closeTab(idx);
+                        }
+                    }
+                }
+            }
+            else if (selectedAction == copyPathAction) {
+                CodeEditor *editor = qobject_cast<CodeEditor*>(targetWidget);
+                if (editor) {
+                    QString path = editor->property("filePath").toString();
+                    if (!path.isEmpty()) {
+                        QApplication::clipboard()->setText(path);
+                    }
+                }
+            }
+            else if (selectedAction == closeAllAction) {
+                // Close tabs from right to left, stopping if the user cancels an unsaved prompt
+                for (int i = tabWidget->count() - 1; i >= 0; --i) {
+                    int initialCount = tabWidget->count();
+                    closeTab(i);
+
+                    // If the tab count didn't change, it means the user clicked "Cancel"
+                    // on an unsaved changes prompt, so we abort closing the rest.
+                    if (tabWidget->count() == initialCount) {
+                        break;
+                    }
+                }
+            }
+        });
+    });
 
     // Status Bar & Version Setup
     langLabel = new QLabel(QString("Unknown"), this);
