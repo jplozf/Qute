@@ -12,6 +12,12 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
+#include <QStandardPaths>
+#include <QDir>
+#include <QTextStream>
+#include <QProcess>
+#include <QFileInfo>
+#include <QElapsedTimer>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -86,6 +92,7 @@ private:
     QLabel *progressLabel;
     QLabel *tabPolicyLabel;
     QLabel *cursorPosLabel;
+    QLabel *readWriteLabel = nullptr;
 
     QMenu *recentFilesMenu;
     QAction *recentFileActions[MaxRecentFiles];
@@ -120,6 +127,11 @@ private:
     QString languageToString(ProgrammingLanguage lang);
     void applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lang);
     void showAboutMessage();
+    void updateStatusBarReadWrite();
+
+    void setupToolsMenu();
+    void executeToolCommand(const QString &commandTemplate);
+    QMenu *toolsMenu = nullptr;
 };
 
 struct IndentInfo {

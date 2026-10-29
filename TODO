@@ -3,7 +3,7 @@ X open file from command line
 X tabs vs spaces
 X dirty flag in tabs
 * follow mode (tail -f)
-* tools menu
+X tools menu
 * git tracking menu
 * goto dialog
 X bash syntax support

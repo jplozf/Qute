@@ -109,6 +109,11 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     modifiedLabel->setAlignment(Qt::AlignCenter);
     modifiedLabel->setStyleSheet("color: #d9534f; font-weight: bold;");
 
+    // Create the Read/Write status indicator label
+    readWriteLabel = new QLabel(this);
+    readWriteLabel->setMinimumWidth(50);
+    readWriteLabel->setAlignment(Qt::AlignCenter);
+
     progressLabel = new QLabel(this);
     progressLabel->setMinimumWidth(55);
     progressLabel->setAlignment(Qt::AlignCenter);
@@ -124,6 +129,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     // Add them as permanent widgets on the right side of the status bar
     statusBar()->addPermanentWidget(sizeLabel);
     statusBar()->addPermanentWidget(modifiedLabel);
+    statusBar()->addPermanentWidget(readWriteLabel);
     statusBar()->addPermanentWidget(progressLabel);
     statusBar()->addPermanentWidget(tabPolicyLabel);
     statusBar()->addPermanentWidget(cursorPosLabel);
@@ -365,6 +371,9 @@ void MainWindow::setupMenus() {
     addLangAction(tr("Java"), ProgrammingLanguage::Java);
     addLangAction(tr("HTML"), ProgrammingLanguage::Html);
     addLangAction(tr("XML"), ProgrammingLanguage::Xml);
+
+    // Tools Menu
+    setupToolsMenu();
 
     // View Menu Actions (Zoom In / Zoom Out)
     zoomInAction = new QAction(tr("Zoom &In"), this);
@@ -624,6 +633,7 @@ void MainWindow::currentTabChanged(int /* index */) {
     } else {
         langLabel->setText(tr(" Unknown "));
     }
+    updateStatusBarReadWrite();
 }
 
 void MainWindow::documentModified(bool modified) {
@@ -1072,41 +1082,154 @@ void MainWindow::showAboutMessage() {
     msgBox.exec();
 }
 
-/*
-void MainWindow::updateLanguageLabel() {
-    if (!langLabel) return;
+void MainWindow::setupToolsMenu() {
+    // Create the Tools menu if it doesn't exist yet
+    if (!toolsMenu) {
+        toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    } else {
+        toolsMenu->clear();
+    }
 
+    // Determine path: ~/.config/YourOrganization/Qute/tools.conf
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QDir().mkpath(configDir); // Ensure directory exists
+    QString confPath = configDir + "/tools.conf";
+
+    // Create default tools.conf if it doesn't exist
+    if (!QFile::exists(confPath)) {
+        QFile file(confPath);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&file);
+            out << "# Define custom tools here: Menu Text : command\n";
+            out << "# Placeholders: %F (full path), %f (filename), %d (directory), %n (name without ext)\n";
+            out << "File Info : exiftool %F\n";
+            out << "Open Containing Folder : xdg-open %d\n";
+        }
+    }
+
+    // Read tools.conf and build menu items
+    QFile file(confPath);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (line.isEmpty() || line.startsWith('#')) continue;
+
+            int colonIdx = line.indexOf(':');
+            if (colonIdx == -1) continue;
+
+            QString menuText = line.left(colonIdx).trimmed();
+            QString command = line.mid(colonIdx + 1).trimmed();
+
+            QAction *action = toolsMenu->addAction(menuText);
+            connect(action, &QAction::triggered, this, [this, command]() {
+                executeToolCommand(command);
+            });
+        }
+    }
+
+    toolsMenu->addSeparator();
+
+    // Add a shortcut action to edit the tools.conf file directly in Qute!
+    QAction *editConfAction = toolsMenu->addAction(tr("Edit tools.conf..."));
+    connect(editConfAction, &QAction::triggered, this, [this, confPath]() {
+        openFileWithPath(confPath);
+    });
+}
+
+void MainWindow::executeToolCommand(const QString &commandTemplate) {
     CodeEditor *editor = currentEditor();
-    if (!editor) {
-        langLabel->setText(tr("None"));
+    if (!editor) return;
+
+    QString filePath = editor->property("filePath").toString();
+    if (filePath.isEmpty()) {
+        QMessageBox::warning(this, tr("Tools"), tr("Please save the file before running external tools."));
         return;
     }
 
-    switch (editor->language()) {
-    case ProgrammingLanguage::Cpp:
-        langLabel->setText("C++");
-        break;
-    case ProgrammingLanguage::Python:
-        langLabel->setText("Python");
-        break;
-    case ProgrammingLanguage::Go:
-        langLabel->setText("Go");
-        break;
-    case ProgrammingLanguage::Bash:
-        langLabel->setText("Bash");
-        break;
-    case ProgrammingLanguage::JavaScript:
-        langLabel->setText("JavaScript");
-        break;
-    case ProgrammingLanguage::Java:
-        langLabel->setText("Java");
-        break;
-    case ProgrammingLanguage::Html:
-        langLabel->setText("HTML");
-        break;
-    case ProgrammingLanguage::Xml:
-        langLabel->setText("XML");
-        break;
+    QFileInfo fileInfo(filePath);
+    QString absPath = fileInfo.absoluteFilePath();
+    QString fileName = fileInfo.fileName();
+    QString dirPath = fileInfo.absolutePath();
+    QString baseName = fileInfo.completeBaseName();
+
+    // Replace placeholders
+    QString cmd = commandTemplate;
+    cmd.replace("%F", QString("\"%1\"").arg(absPath));
+    cmd.replace("%f", QString("\"%1\"").arg(fileName));
+    cmd.replace("%d", QString("\"%1\"").arg(dirPath));
+    cmd.replace("%n", QString("\"%1\"").arg(baseName));
+
+    // Create a QProcess and a high-precision timer
+    QProcess *process = new QProcess(this);
+    process->setProcessChannelMode(QProcess::MergedChannels);
+
+    QElapsedTimer *timer = new QElapsedTimer();
+    timer->start();
+
+    // Connect to when the process finishes
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, process, timer, cmd](int exitCode, QProcess::ExitStatus exitStatus) {
+
+                qint64 elapsedMs = timer->elapsed();
+                delete timer;
+
+                QByteArray rawOutput = process->readAllStandardOutput();
+                process->deleteLater();
+
+                // Build a clean diagnostic header & footer
+                QByteArray finalContent;
+                finalContent.append(QString("--- Command: %1 ---\n").arg(cmd).toUtf8());
+                finalContent.append(QString("--- Time elapsed: %1 ms ---\n\n").arg(elapsedMs).toUtf8());
+
+                if (!rawOutput.isEmpty()) {
+                    finalContent.append(rawOutput);
+                } else {
+                    finalContent.append("(Command produced no standard output)\n");
+                }
+
+                if (exitStatus != QProcess::NormalExit) {
+                    finalContent.append("\n[Error: Process crashed or failed to start normally]\n");
+                } else if (exitCode != 0) {
+                    finalContent.append(QString("\n[Process exited with non-zero code %1]\n").arg(exitCode).toUtf8());
+                }
+
+                // Open a new editor tab for the output
+                newFile();
+                CodeEditor *outputEditor = currentEditor();
+                if (!outputEditor) return;
+
+                outputEditor->setPlainText(QString::fromUtf8(finalContent));
+                outputEditor->setReadOnly(true);
+                updateStatusBarReadWrite(); // Reflect RO status immediately
+
+                // Set descriptive tab title
+                int currentIndex = tabWidget->currentIndex();
+                tabWidget->setTabText(currentIndex, tr("Output : %1").arg(cmd.section(' ', 0, 0)));
+            });
+
+    // Start the process via shell
+#if defined(Q_OS_UNIX)
+    process->start("/bin/sh", QStringList() << "-c" << cmd);
+#elif defined(Q_OS_WIN)
+    process->start("cmd.exe", QStringList() << "/c" << cmd);
+#endif
+}
+
+void MainWindow::updateStatusBarReadWrite() {
+    if (!readWriteLabel) return;
+
+    CodeEditor *editor = currentEditor();
+    if (!editor) {
+        readWriteLabel->setText("");
+        return;
+    }
+
+    if (editor->isReadOnly()) {
+        readWriteLabel->setText(tr("RO"));
+        readWriteLabel->setStyleSheet("QLabel { color: #d9534f; font-weight: bold; }"); // Soft red for Read-Only
+    } else {
+        readWriteLabel->setText(tr("RW"));
+        readWriteLabel->setStyleSheet("QLabel { color: #5cb85c; font-weight: bold; }"); // Soft green for Read-Write
     }
 }
-*/
