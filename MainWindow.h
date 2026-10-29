@@ -18,6 +18,9 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QElapsedTimer>
+#include <QTimer>
+#include <QFile>
+#include <QScrollBar>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -103,6 +106,7 @@ private:
     QAction *openAction;
     QAction *saveAction;
     QAction *saveAsAction;
+    QAction *followAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
@@ -128,6 +132,7 @@ private:
     void applySmartTabPolicy(CodeEditor *editor, ProgrammingLanguage lang);
     void showAboutMessage();
     void updateStatusBarReadWrite();
+    void openFileInFollowMode(const QString &filePath);
 
     void setupToolsMenu();
     void executeToolCommand(const QString &commandTemplate);

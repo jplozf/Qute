@@ -291,13 +291,25 @@ void MainWindow::setupMenus() {
         recentFileActions[i]->setVisible(false);
     }
 
+    followAction = new QAction(tr("Open in &Follow mode ..."), this);
+    followAction->setIcon(QIcon(":/icons/Recycle.png"));
+    connect(followAction, &QAction::triggered, this, [this]() {
+        QString filePath = QFileDialog::getOpenFileName(this, tr("Open File for Following"));
+        if (!filePath.isEmpty()) {
+            openFileInFollowMode(filePath);
+        }
+    });
+
     fileMenu->addAction(saveAction);
     fileMenu->addAction(saveAsAction);
     fileMenu->addAction(printAction);
     fileMenu->addSeparator();
+    fileMenu->addAction(followAction);
+    fileMenu->addSeparator();
     fileMenu->addAction(closeTabAction);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("&Quit"), this, &QWidget::close, QKeySequence::Quit);
+
 
     // Edit Menu Actions
     cutAction = new QAction(tr("Cu&t"), this);
@@ -447,6 +459,7 @@ void MainWindow::setupToolBar() {
 
     toolBar->addAction(newAction);
     toolBar->addAction(openAction);
+    toolBar->addAction(followAction);
     toolBar->addAction(saveAction);
     toolBar->addAction(saveAsAction);
     toolBar->addAction(printAction);
@@ -870,7 +883,7 @@ void MainWindow::closeTab(int index) {
     if (index < 0 || index >= tabWidget->count()) return;
 
     CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(index));
-    if (editor && editor->document()->isModified()) {
+    if (!editor->isReadOnly() && editor->document()->isModified()) {
         tabWidget->setCurrentIndex(index);
         if (!maybeSave(editor)) {
             return;
@@ -1132,6 +1145,7 @@ void MainWindow::setupToolsMenu() {
 
     // Add a shortcut action to edit the tools.conf file directly in Qute!
     QAction *editConfAction = toolsMenu->addAction(tr("Edit tools.conf..."));
+    editConfAction->setIcon(QIcon(":/icons/Write.png"));
     connect(editConfAction, &QAction::triggered, this, [this, confPath]() {
         openFileWithPath(confPath);
     });
@@ -1201,6 +1215,7 @@ void MainWindow::executeToolCommand(const QString &commandTemplate) {
 
                 outputEditor->setPlainText(QString::fromUtf8(finalContent));
                 outputEditor->setReadOnly(true);
+                outputEditor->document()->setModified(false);
                 updateStatusBarReadWrite(); // Reflect RO status immediately
 
                 // Set descriptive tab title
@@ -1232,4 +1247,78 @@ void MainWindow::updateStatusBarReadWrite() {
         readWriteLabel->setText(tr("RW"));
         readWriteLabel->setStyleSheet("QLabel { color: #5cb85c; font-weight: bold; }"); // Soft green for Read-Write
     }
+}
+
+void MainWindow::openFileInFollowMode(const QString &filePath) {
+    if (filePath.isEmpty() || !QFile::exists(filePath)) return;
+
+    // Open a new read-only editor tab for the log file
+    newFile();
+    CodeEditor *editor = currentEditor();
+    if (!editor) return;
+
+    // Load initial content
+    QFile *file = new QFile(filePath, editor); // Parented to editor for clean memory management
+    if (!file->open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Follow Mode"), tr("Could not open file for reading."));
+        closeTab(tabWidget->currentIndex());
+        return;
+    }
+
+    QTextStream in(file);
+    editor->setPlainText(in.readAll());
+    editor->setReadOnly(true);
+    editor->document()->setModified(false);
+    updateStatusBarReadWrite();
+
+    // Set descriptive tab title with a indicator
+    QFileInfo fileInfo(filePath);
+    int currentIndex = tabWidget->currentIndex();
+    tabWidget->setTabText(currentIndex, tr("Following : %1").arg(fileInfo.fileName()));
+    editor->setProperty("filePath", filePath);
+
+    // Scroll to the very bottom initially
+    editor->verticalScrollBar()->setValue(editor->verticalScrollBar()->maximum());
+
+    // Set up a QTimer to poll for changes every 500ms
+    QTimer *followTimer = new QTimer(editor);
+
+    // Track the last known file read position & size
+    qint64 *lastPos = new qint64(file->pos());
+
+    connect(followTimer, &QTimer::timeout, this, [this, editor, file, lastPos, filePath]() {
+        // If the editor tab was closed or destroyed, stop everything
+        if (!editor || !file) return;
+
+        // Check if file still exists on disk
+        QFileInfo info(filePath);
+        if (!info.exists()) return;
+
+        if (file->size() < *lastPos) {
+            // File was truncated or rotated! Reset position to 0
+            file->seek(0);
+            *lastPos = 0;
+            editor->clear();
+        }
+
+        if (file->size() > *lastPos) {
+            file->seek(*lastPos);
+            QByteArray newData = file->readAll();
+            *lastPos = file->pos();
+
+            // Append new text smoothly
+            QTextCursor cursor = editor->textCursor();
+            cursor.movePosition(QTextCursor::End);
+            cursor.insertText(QString::fromUtf8(newData));
+            editor->document()->setModified(false);
+
+            // Auto-scroll to bottom to follow new lines
+            editor->verticalScrollBar()->setValue(editor->verticalScrollBar()->maximum());
+
+            updateCursorPosition();
+        }
+    });
+
+    // Start polling every 500 milliseconds
+    followTimer->start(500);
 }
