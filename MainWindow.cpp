@@ -228,6 +228,9 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     if (tabWidget->count() == 0) {
         newFile();
     }
+
+    // Trigger update check asynchronously 2 seconds after launch
+    QTimer::singleShot(2000, this, &MainWindow::checkForUpdates);
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -1105,7 +1108,7 @@ void MainWindow::showAboutMessage() {
                             .arg(GIT_COMMIT_COUNT)
                             .arg(GIT_HASH);
     msgBox.setWindowTitle("About " + appConstants->getQString("APPLICATION_NAME"));
-    msgBox.setText(aboutText + "\n\n" + appConstants->getQString("COPYRIGHT") + "\n\n" + appConstants->getQString("EMAIL"));
+    msgBox.setText(aboutText + "\n" + appConstants->getQString("COPYRIGHT") + "\n\n" + appConstants->getQString("EMAIL"));
 
     QPixmap customIcon(":/icons/Qute_icon.png");
     if (!customIcon.isNull()) {
@@ -1478,4 +1481,57 @@ bool MainWindow::activateTabIfAlreadyOpen(const QString &filePath) {
         }
     }
     return false;
+}
+
+void MainWindow::checkForUpdates() {
+    if (!updateManager) {
+        updateManager = new QNetworkAccessManager(this);
+    }
+
+    QNetworkRequest request(QUrl("https://api.github.com/repos/jplozf/Qute/commits/HEAD"));
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Qute-TextEditor");
+
+    QNetworkReply *reply = updateManager->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+
+        if (reply->error() != QNetworkReply::NoError) {
+            return; // Fail silently if offline or rate-limited
+        }
+
+        QByteArray data = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject obj = doc.object();
+
+        // GitHub's /commits/HEAD endpoint returns a commit object with a "sha" field
+        QString remoteFullSha = obj["sha"].toString();
+        QString commitUrl = obj["html_url"].toString();
+
+        if (remoteFullSha.isEmpty()) return;
+
+        // Take the short hash (first 7 characters, matching Git's standard short hash)
+        QString remoteShortSha = remoteFullSha.left(7);
+
+        // Assumes you have a CMake macro for your local short hash, e.g., GIT_HASH
+        // (Make sure your CMake target_compile_definitions includes it!)
+        QString localShortSha = QString(GIT_HASH).trimmed();
+
+        if (!localShortSha.isEmpty() && remoteShortSha != localShortSha) {
+            QMessageBox::StandardButton replyBox = QMessageBox::information(
+                this,
+                tr("Update Available"),
+                tr("A newer commit is available on GitHub!\n\n"
+                   "Local  commit: %1\n"
+                   "Remote commit: %2\n\n"
+                   "Would you like to open the repository in your browser ?")
+                    .arg(localShortSha)
+                    .arg(remoteShortSha),
+                QMessageBox::Yes | QMessageBox::No
+                );
+
+            if (replyBox == QMessageBox::Yes) {
+                QDesktopServices::openUrl(QUrl(commitUrl));
+            }
+        }
+    });
 }

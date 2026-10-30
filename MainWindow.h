@@ -21,6 +21,12 @@
 #include <QTimer>
 #include <QFile>
 #include <QScrollBar>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkReply>
+#include <QDesktopServices>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -146,6 +152,9 @@ private:
     void setupToolsMenu();
     void executeToolCommand(const QString &commandTemplate);
     QMenu *toolsMenu = nullptr;
+
+    void checkForUpdates();
+    QNetworkAccessManager *updateManager = nullptr;
 };
 
 struct IndentInfo {
