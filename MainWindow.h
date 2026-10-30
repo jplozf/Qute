@@ -52,6 +52,7 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(const QStringList &commandLineFiles = QStringList(), QWidget *parent = nullptr);
     Constants *appConstants;
+    void openFileWithPath(const QString &fileName);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -136,7 +137,6 @@ private:
 
     void setupMenus();
     void setupToolBar();
-    void openFileWithPath(const QString &fileName);
     bool maybeSave(CodeEditor *editor);
     CodeEditor *currentEditor();
     QString strippedName(const QString &fullFileName);
