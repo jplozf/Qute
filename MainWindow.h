@@ -119,6 +119,15 @@ private:
     QAction *convertToSpacesAction;
     QAction *convertToTabsAction;
 
+    void setupFavoritesMenu();
+    void addToFavorites(const QString &filePath, bool isFollowMode);
+    void removeFromFavorites(const QString &filePath, bool isFollowMode);
+    bool activateTabIfAlreadyOpen(const QString &filePath);
+
+    QMenu *favoritesMenu = nullptr;
+    QMenu *regularFavMenu = nullptr;
+    QMenu *followedFavMenu = nullptr;
+
     void setupMenus();
     void setupToolBar();
     void openFileWithPath(const QString &fileName);

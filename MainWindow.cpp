@@ -40,6 +40,8 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
         QAction *closeOthersAction = tabMenu.addAction(tr("Close Other Tabs"));
         QAction *copyPathAction = tabMenu.addAction(tr("Copy File Path"));
         tabMenu.addSeparator();
+        QAction *addToFavAction = tabMenu.addAction(tr("Add to Favorites"));
+        tabMenu.addSeparator();
         QAction *closeAllAction = tabMenu.addAction(tr("Close All Tabs"));
 
         // Execute menu at cursor position
@@ -50,7 +52,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
         QWidget *targetWidget = tabWidget->widget(index);
 
         // Defer execution slightly to let the menu event loop fully exit first
-        QTimer::singleShot(0, this, [this, targetWidget, selectedAction, closeAction, closeOthersAction, copyPathAction, closeAllAction]() {
+        QTimer::singleShot(0, this, [this, targetWidget, selectedAction, closeAction, closeOthersAction, copyPathAction, addToFavAction, closeAllAction]() {
             if (selectedAction == closeAction) {
                 int idx = tabWidget->indexOf(targetWidget);
                 if (idx != -1) {
@@ -88,6 +90,18 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
                     // on an unsaved changes prompt, so we abort closing the rest.
                     if (tabWidget->count() == initialCount) {
                         break;
+                    }
+                }
+            }
+            else if (selectedAction == addToFavAction) {
+                CodeEditor *editor = qobject_cast<CodeEditor*>(targetWidget);
+                if (editor) {
+                    QString path = editor->property("filePath").toString();
+                    bool isFollow = editor->property("isFollowMode").toBool();
+                    if (!path.isEmpty()) {
+                        addToFavorites(path, isFollow);
+                    } else {
+                        QMessageBox::warning(this, tr("Favorites"), tr("Please save the file before adding it to favorites."));
                     }
                 }
             }
@@ -135,6 +149,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     statusBar()->addPermanentWidget(cursorPosLabel);
 
     setupMenus();
+    setupFavoritesMenu();
     setupToolBar();
 
     // Global keyboard shortcuts for tab navigation
@@ -182,11 +197,15 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
             settings.setArrayIndex(i);
             QString filePath = settings.value("filePath").toString();
             int langInt = settings.value("language", static_cast<int>(ProgrammingLanguage::Cpp)).toInt();
+            bool isFollow = settings.value("isFollowMode", false).toBool();
 
             if (!filePath.isEmpty() && QFile::exists(filePath)) {
-                // Open your file (which creates the editor tab)
-                openFileWithPath(filePath);
-
+                if (isFollow) {
+                    openFileInFollowMode(filePath);
+                } else {
+                    // Open your file (which creates the editor tab)
+                    openFileWithPath(filePath);
+                }
                 // Get the newly created editor and apply the saved language
                 CodeEditor *editor = currentEditor();
                 if (editor) {
@@ -243,6 +262,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         settings.setArrayIndex(i);
         settings.setValue("filePath", filePath);
         settings.setValue("language", static_cast<int>(editor->language())); // Save language enum as int
+        settings.setValue("isFollowMode", editor->property("isFollowMode").toBool());
     }
     settings.endArray();
     settings.setValue("currentIndex", tabWidget->currentIndex());
@@ -299,12 +319,11 @@ void MainWindow::setupMenus() {
             openFileInFollowMode(filePath);
         }
     });
+    fileMenu->addAction(followAction);
 
     fileMenu->addAction(saveAction);
     fileMenu->addAction(saveAsAction);
     fileMenu->addAction(printAction);
-    fileMenu->addSeparator();
-    fileMenu->addAction(followAction);
     fileMenu->addSeparator();
     fileMenu->addAction(closeTabAction);
     fileMenu->addSeparator();
@@ -735,6 +754,8 @@ void MainWindow::openFile() {
 }
 
 void MainWindow::openFileWithPath(const QString &fileName) {
+    if (activateTabIfAlreadyOpen(fileName)) return;
+
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this, tr("Error"), tr("Cannot read file %1:\n%2.").arg(fileName, file.errorString()));
@@ -1250,6 +1271,8 @@ void MainWindow::updateStatusBarReadWrite() {
 }
 
 void MainWindow::openFileInFollowMode(const QString &filePath) {
+    if (activateTabIfAlreadyOpen(filePath)) return;
+
     if (filePath.isEmpty() || !QFile::exists(filePath)) return;
 
     // Open a new read-only editor tab for the log file
@@ -1274,8 +1297,9 @@ void MainWindow::openFileInFollowMode(const QString &filePath) {
     // Set descriptive tab title with a indicator
     QFileInfo fileInfo(filePath);
     int currentIndex = tabWidget->currentIndex();
-    tabWidget->setTabText(currentIndex, tr("Following : %1").arg(fileInfo.fileName()));
+    tabWidget->setTabText(currentIndex, tr("♻ %1").arg(fileInfo.fileName()));
     editor->setProperty("filePath", filePath);
+    editor->setProperty("isFollowMode", true);
 
     // Scroll to the very bottom initially
     editor->verticalScrollBar()->setValue(editor->verticalScrollBar()->maximum());
@@ -1321,4 +1345,137 @@ void MainWindow::openFileInFollowMode(const QString &filePath) {
 
     // Start polling every 500 milliseconds
     followTimer->start(500);
+}
+
+void MainWindow::setupFavoritesMenu() {
+    if (!favoritesMenu) {
+        favoritesMenu = menuBar()->addMenu(tr("&Favorites"));
+    } else {
+        favoritesMenu->clear();
+    }
+
+    regularFavMenu = favoritesMenu->addMenu(tr("Regular Files"));
+    followedFavMenu = favoritesMenu->addMenu(tr("Followed Files"));
+    favoritesMenu->addSeparator();
+
+    QAction *clearFavAction = favoritesMenu->addAction(tr("Clear All Favorites"));
+    connect(clearFavAction, &QAction::triggered, this, [this]() {
+        QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
+        settings.remove("Favorites/RegularFiles");
+        settings.remove("Favorites/FollowedFiles");
+        setupFavoritesMenu();
+    });
+
+    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
+    QStringList regularFiles = settings.value("Favorites/RegularFiles").toStringList();
+    QStringList followedFiles = settings.value("Favorites/FollowedFiles").toStringList();
+
+    // Regular Files Submenu ---
+    regularFavMenu->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(regularFavMenu, &QMenu::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QAction *action = regularFavMenu->actionAt(pos);
+        if (!action || !action->data().isValid()) return;
+
+        QString path = action->data().toString();
+        QMenu contextMenu(this);
+        QAction *removeAction = contextMenu.addAction(tr("Remove from Favorites"));
+
+        if (contextMenu.exec(regularFavMenu->mapToGlobal(pos)) == removeAction) {
+            removeFromFavorites(path, false);
+        }
+    });
+
+    if (regularFiles.isEmpty()) {
+        QAction *emptyAction = regularFavMenu->addAction(tr("(Empty)"));
+        emptyAction->setEnabled(false);
+    } else {
+        for (const QString &path : regularFiles) {
+            QFileInfo info(path);
+            QAction *action = regularFavMenu->addAction(info.fileName());
+            action->setData(path); // Store full path in action data
+            connect(action, &QAction::triggered, this, [this, path]() {
+                openFileWithPath(path);
+            });
+        }
+    }
+
+    // --- 2. Followed Files Submenu ---
+    followedFavMenu->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(followedFavMenu, &QMenu::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QAction *action = followedFavMenu->actionAt(pos);
+        if (!action || !action->data().isValid()) return;
+
+        QString path = action->data().toString();
+        QMenu contextMenu(this);
+        QAction *removeAction = contextMenu.addAction(tr("Remove from Favorites"));
+
+        if (contextMenu.exec(followedFavMenu->mapToGlobal(pos)) == removeAction) {
+            removeFromFavorites(path, true);
+        }
+    });
+
+    if (followedFiles.isEmpty()) {
+        QAction *emptyAction = followedFavMenu->addAction(tr("(Empty)"));
+        emptyAction->setEnabled(false);
+    } else {
+        for (const QString &path : followedFiles) {
+            QFileInfo info(path);
+            QAction *action = followedFavMenu->addAction(info.fileName());
+            action->setData(path); // Store full path in action data
+            connect(action, &QAction::triggered, this, [this, path]() {
+                openFileInFollowMode(path);
+            });
+        }
+    }
+}
+
+void MainWindow::addToFavorites(const QString &filePath, bool isFollowMode) {
+    if (filePath.isEmpty()) return;
+
+    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
+    QString key = isFollowMode ? "Favorites/FollowedFiles" : "Favorites/RegularFiles";
+    QStringList list = settings.value(key).toStringList();
+
+    if (!list.contains(filePath)) {
+        list.append(filePath);
+        settings.setValue(key, list);
+        setupFavoritesMenu(); // Refresh menu immediately
+    }
+}
+
+void MainWindow::removeFromFavorites(const QString &filePath, bool isFollowMode) {
+    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
+    QString key = isFollowMode ? "Favorites/FollowedFiles" : "Favorites/RegularFiles";
+    QStringList list = settings.value(key).toStringList();
+
+    if (list.removeAll(filePath) > 0) {
+        settings.setValue(key, list);
+        setupFavoritesMenu(); // Refresh menu immediately
+    }
+}
+
+bool MainWindow::activateTabIfAlreadyOpen(const QString &filePath) {
+    if (filePath.isEmpty()) return false;
+
+    QFileInfo targetInfo(filePath);
+    QString canonicalTarget = targetInfo.canonicalFilePath();
+    if (canonicalTarget.isEmpty()) canonicalTarget = targetInfo.absoluteFilePath();
+
+    for (int i = 0; i < tabWidget->count(); ++i) {
+        CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
+        if (!editor) continue;
+
+        QString currentPath = editor->property("filePath").toString();
+        if (!currentPath.isEmpty()) {
+            QFileInfo currentInfo(currentPath);
+            QString canonicalCurrent = currentInfo.canonicalFilePath();
+            if (canonicalCurrent.isEmpty()) canonicalCurrent = currentInfo.absoluteFilePath();
+
+            if (canonicalCurrent == canonicalTarget) {
+                tabWidget->setCurrentIndex(i); // Bring existing tab to front
+                return true;
+            }
+        }
+    }
+    return false;
 }
