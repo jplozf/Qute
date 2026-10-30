@@ -1520,9 +1520,9 @@ void MainWindow::checkForUpdates() {
             QMessageBox::StandardButton replyBox = QMessageBox::information(
                 this,
                 tr("Update Available"),
-                tr("A newer commit is available on GitHub!\n\n"
-                   "Local  commit: %1\n"
-                   "Remote commit: %2\n\n"
+                tr("A newer version is available on GitHub !\n\n"
+                   "%1 : Local version\n"
+                   "%2 : Remote version\n\n"
                    "Would you like to open the repository in your browser ?")
                     .arg(localShortSha)
                     .arg(remoteShortSha),
