@@ -1140,7 +1140,9 @@ void MainWindow::setupToolsMenu() {
     }
 
     // Determine path: ~/.config/YourOrganization/Qute/tools.conf
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                        + "/" + appConstants->getQString("ORGANIZATION_NAME")
+                        + "/" + appConstants->getQString("APPLICATION_NAME");
     QDir().mkpath(configDir); // Ensure directory exists
     QString confPath = configDir + "/tools.conf";
 
@@ -1154,6 +1156,22 @@ void MainWindow::setupToolsMenu() {
             out << "File Info : exiftool %F\n";
             out << "Open Containing Folder : xdg-open %d\n";
         }
+    }
+
+    // --- SETUP FILE SYSTEM WATCHER FOR LIVE RELOADING ---
+    if (!toolsWatcher) {
+        toolsWatcher = new QFileSystemWatcher(this);
+        toolsWatcher->addPath(confPath);
+        connect(toolsWatcher, &QFileSystemWatcher::fileChanged, this, [this, confPath](const QString &path) {
+            // Re-add path in case file replacement on save dropped the watch
+            if (!toolsWatcher->files().contains(path)) {
+                toolsWatcher->addPath(path);
+            }
+            // Refresh the tools menu live!
+            setupToolsMenu();
+        });
+    } else if (!toolsWatcher->files().contains(confPath)) {
+        toolsWatcher->addPath(confPath);
     }
 
     // Read tools.conf and build menu items

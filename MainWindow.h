@@ -27,6 +27,7 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QDesktopServices>
+#include <QFileSystemWatcher>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -155,6 +156,7 @@ private:
 
     void checkForUpdates();
     QNetworkAccessManager *updateManager = nullptr;
+    QFileSystemWatcher *toolsWatcher = nullptr;
 };
 
 struct IndentInfo {
