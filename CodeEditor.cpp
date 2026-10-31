@@ -94,6 +94,8 @@ void CodeEditor::setTheme(EditorTheme theme) {
 }
 
 void CodeEditor::highlightCurrentLine() {
+    updateExtraSelections();
+    /*
     QList<QTextEdit::ExtraSelection> extraSelections;
 
     if (!isReadOnly()) {
@@ -116,6 +118,70 @@ void CodeEditor::highlightCurrentLine() {
         else if (m_theme == EditorTheme::GitHubDark)
             lineColor = QColor(22, 27, 34);       // Accent Background Line
         else if (m_theme == EditorTheme::Coffee)
+            lineColor = QColor(232, 222, 210);
+
+        selection.format.setBackground(lineColor);
+        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+        selection.cursor = textCursor();
+        selection.cursor.clearSelection();
+        extraSelections.append(selection);
+    }
+
+    setExtraSelections(extraSelections);
+*/
+}
+
+void CodeEditor::updateExtraSelections() {
+    QList<QTextEdit::ExtraSelection> extraSelections;
+
+    // 1. Highlight all search matches across the document
+    if (!m_searchString.isEmpty()) {
+        // Choose a pleasant highlight color depending on dark/light themes
+        bool isDark = (m_theme == EditorTheme::DarkVS || m_theme == EditorTheme::Monokai ||
+                       m_theme == EditorTheme::SolarizedDark || m_theme == EditorTheme::Nord ||
+                       m_theme == EditorTheme::Dracula || m_theme == EditorTheme::OneDark ||
+                       m_theme == EditorTheme::GitHubDark);
+
+        // ---> VIBRANT, FLASHY YELLOW HIGHLIGHT <---
+        // Pure electric yellow background with dark text for maximum contrast
+        QColor searchHighlightColor = QColor(255, 235, 59); // Bright yellow
+        QColor searchTextColor = Qt::black;                  // High contrast text
+
+        QTextDocument *doc = document();
+        QTextCursor cursor(doc);
+        cursor.movePosition(QTextCursor::Start);
+
+        while (!(cursor = doc->find(m_searchString, cursor, m_searchFlags)).isNull()) {
+            QTextEdit::ExtraSelection selection;
+            selection.format.setBackground(searchHighlightColor);
+            selection.format.setForeground(searchTextColor); // Keeps text sharp & readable
+            selection.cursor = cursor;
+            extraSelections.append(selection);
+        }
+    }
+
+    // 2. Highlight current line
+    if (!isReadOnly()) {
+        QTextEdit::ExtraSelection selection;
+        QColor lineColor;
+
+        if (m_theme == EditorTheme::Light)
+            lineColor = QColor(230, 240, 250);
+        else if (m_theme == EditorTheme::DarkVS)
+            lineColor = QColor(45, 45, 48);
+        else if (m_theme == EditorTheme::Monokai)
+            lineColor = QColor(62, 61, 50);
+        else if (m_theme == EditorTheme::SolarizedDark)
+            lineColor = QColor(7, 54, 66);
+        else if (m_theme == EditorTheme::Nord)
+            lineColor = QColor(59, 66, 82);
+        else if (m_theme == EditorTheme::Dracula)
+            lineColor = QColor(68, 71, 90);
+        else if (m_theme == EditorTheme::OneDark)
+            lineColor = QColor(44, 49, 58);
+        else if (m_theme == EditorTheme::GitHubDark)
+            lineColor = QColor(22, 27, 34);
+        else // Coffee
             lineColor = QColor(232, 222, 210);
 
         selection.format.setBackground(lineColor);
@@ -239,4 +305,10 @@ void CodeEditor::keyPressEvent(QKeyEvent *event) {
     }
 
     QPlainTextEdit::keyPressEvent(event);
+}
+
+void CodeEditor::setSearchHighlight(const QString &searchString, QTextDocument::FindFlags flags) {
+    m_searchString = searchString;
+    m_searchFlags = flags;
+    updateExtraSelections();
 }

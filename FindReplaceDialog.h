@@ -26,4 +26,6 @@ private:
     QPushButton *findButton;
     QPushButton *replaceButton;
     QPushButton *replaceAllButton;
+    void triggerHighlightUpdate();
+    void closeEvent(QCloseEvent *event);
 };

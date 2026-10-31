@@ -20,6 +20,7 @@ public:
     bool insertSpacesForTabs() const { return m_insertSpaces; }
     void setLanguage(ProgrammingLanguage lang) { m_language = lang; }
     ProgrammingLanguage language() const { return m_language; }
+    void setSearchHighlight(const QString &searchString, QTextDocument::FindFlags flags);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -36,6 +37,9 @@ private:
     int m_tabWidth = 4;
     bool m_insertSpaces = true;
     ProgrammingLanguage m_language = ProgrammingLanguage::PlainText;
+    QString m_searchString;
+    QTextDocument::FindFlags m_searchFlags;
+    void updateExtraSelections();
 };
 
 class LineNumberArea : public QWidget {

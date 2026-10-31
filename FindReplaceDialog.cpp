@@ -56,10 +56,22 @@ FindReplaceDialog::FindReplaceDialog(CodeEditor *editor, QWidget *parent)
     connect(replaceAllButton, &QPushButton::clicked, this, &FindReplaceDialog::replaceAll);
     connect(closeButton, &QPushButton::clicked, this, &QDialog::close);
     connect(findLineEdit, &QLineEdit::returnPressed, this, &FindReplaceDialog::findNext);
+    // Connections for Live Search Highlighting
+    connect(findLineEdit, &QLineEdit::textChanged, this, &FindReplaceDialog::triggerHighlightUpdate);
+    connect(caseCheckBox, &QCheckBox::stateChanged, this, &FindReplaceDialog::triggerHighlightUpdate);
+    connect(wholeWordCheckBox, &QCheckBox::stateChanged, this, &FindReplaceDialog::triggerHighlightUpdate);
 }
 
 void FindReplaceDialog::setEditor(CodeEditor *editor) {
+    // Clear highlights on previous editor if it exists
+    if (m_editor) {
+        m_editor->setSearchHighlight(QString(), {});
+    }
+
     m_editor = editor;
+
+    // Apply current search text to the new editor
+    triggerHighlightUpdate();
 }
 
 void FindReplaceDialog::findNext() {
@@ -122,4 +134,25 @@ void FindReplaceDialog::replaceAll() {
     cursor.endEditBlock();
 
     QMessageBox::information(this, tr("Replace All"), tr("Replaced %1 occurrences.").arg(count));
+}
+
+void FindReplaceDialog::triggerHighlightUpdate() {
+    if (!m_editor) return;
+    QString target = findLineEdit->text();
+
+    QTextDocument::FindFlags flags;
+    if (caseCheckBox && caseCheckBox->isChecked())
+        flags |= QTextDocument::FindCaseSensitively;
+    if (wholeWordCheckBox && wholeWordCheckBox->isChecked())
+        flags |= QTextDocument::FindWholeWords;
+
+    m_editor->setSearchHighlight(target, flags);
+}
+
+// Clear highlights when the dialog is closed
+void FindReplaceDialog::closeEvent(QCloseEvent *event) {
+    if (m_editor) {
+        m_editor->setSearchHighlight(QString(), {}); // Clear highlights
+    }
+    QDialog::closeEvent(event);
 }
