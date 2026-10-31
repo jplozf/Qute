@@ -179,6 +179,34 @@ void SyntaxHighlighter::setTheme(EditorTheme theme) {
         functionFormat.setForeground(QColor(136, 192, 208));
         tagFormat.setForeground(QColor(180, 142, 173));
         break;
+    case EditorTheme::Dracula:
+        keywordFormat.setForeground(QColor(255, 121, 198)); // Pink
+        singleLineCommentFormat.setForeground(QColor(98, 114, 164)); // Muted Blue-Gray
+        quotationFormat.setForeground(QColor(241, 250, 140)); // Yellow
+        functionFormat.setForeground(QColor(80, 250, 123)); // Green
+        tagFormat.setForeground(QColor(139, 233, 253)); // Cyan
+        break;
+    case EditorTheme::OneDark:
+        keywordFormat.setForeground(QColor(198, 120, 221)); // Purple
+        singleLineCommentFormat.setForeground(QColor(92, 99, 112)); // Gray
+        quotationFormat.setForeground(QColor(152, 195, 121)); // Green
+        functionFormat.setForeground(QColor(97, 175, 239)); // Blue
+        tagFormat.setForeground(QColor(224, 108, 117)); // Red/Coral
+        break;
+    case EditorTheme::GitHubDark:
+        keywordFormat.setForeground(QColor(255, 123, 114)); // Salmon/Red
+        singleLineCommentFormat.setForeground(QColor(139, 148, 158)); // Gray
+        quotationFormat.setForeground(QColor(165, 214, 255)); // Light Blue
+        functionFormat.setForeground(QColor(210, 168, 255)); // Purple
+        tagFormat.setForeground(QColor(119, 221, 169)); // Mint Green
+        break;
+    case EditorTheme::Coffee:
+        keywordFormat.setForeground(QColor(165, 82, 45));       // Terracotta / Rust
+        singleLineCommentFormat.setForeground(QColor(115, 125, 95)); // Warm Olive Gray
+        quotationFormat.setForeground(QColor(140, 95, 20));     // Deep Amber / Bronze
+        functionFormat.setForeground(QColor(41, 105, 138));     // Deep Slate Blue
+        tagFormat.setForeground(QColor(115, 66, 128));          // Warm Plum
+        break;
     }
     setupRules();
     rehighlight();

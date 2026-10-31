@@ -35,7 +35,7 @@ private:
     EditorTheme m_theme = EditorTheme::Light;
     int m_tabWidth = 4;
     bool m_insertSpaces = true;
-    ProgrammingLanguage m_language = ProgrammingLanguage::Cpp;
+    ProgrammingLanguage m_language = ProgrammingLanguage::PlainText;
 };
 
 class LineNumberArea : public QWidget {

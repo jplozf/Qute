@@ -25,7 +25,7 @@ SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidt
 
     // Theme Setting Row
     themeComboBox = new QComboBox(this);
-    themeComboBox->addItems({tr("Light"), tr("Dark (VS Code)"), tr("Monokai"), tr("Solarized Dark"), tr("Nord")});
+    themeComboBox->addItems({tr("Light"), tr("Dark (VS Code)"), tr("Monokai"), tr("Solarized Dark"), tr("Nord"), tr("Dracula"), tr("OneDark"), tr("GitHubDark"), tr("Coffee")});
     themeComboBox->setCurrentIndex(static_cast<int>(m_theme));
     formLayout->addRow(tr("Syntax Theme:"), themeComboBox);
 

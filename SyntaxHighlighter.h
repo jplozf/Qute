@@ -9,7 +9,11 @@ enum class EditorTheme {
     DarkVS,
     Monokai,
     SolarizedDark,
-    Nord
+    Nord,
+    Dracula,
+    OneDark,
+    GitHubDark,
+    Coffee
 };
 
 enum class ProgrammingLanguage {

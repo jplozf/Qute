@@ -71,6 +71,22 @@ void CodeEditor::setTheme(EditorTheme theme) {
         p.setColor(QPalette::Base, QColor(46, 52, 64));      // Dark Navy Gray
         p.setColor(QPalette::Text, QColor(216, 222, 233));   // Ice White
         break;
+    case EditorTheme::Dracula:
+        p.setColor(QPalette::Base, QColor(40, 42, 54));       // Dark Purple-Gray
+        p.setColor(QPalette::Text, QColor(248, 248, 242));    // Off-White
+        break;
+    case EditorTheme::OneDark:
+        p.setColor(QPalette::Base, QColor(40, 44, 52));       // Deep Dark Slate
+        p.setColor(QPalette::Text, QColor(171, 178, 191));    // Light Gray
+        break;
+    case EditorTheme::GitHubDark:
+        p.setColor(QPalette::Base, QColor(13, 17, 23));       // GitHub Dark Canvas
+        p.setColor(QPalette::Text, QColor(240, 246, 252));    // Bright White-Gray
+        break;
+    case EditorTheme::Coffee:
+        p.setColor(QPalette::Base, QColor(245, 239, 230));    // Warm Cream / Beige
+        p.setColor(QPalette::Text, QColor(74, 59, 50));       // Espresso Brown
+        break;
     }
     setPalette(p);
     highlightCurrentLine();
@@ -91,8 +107,16 @@ void CodeEditor::highlightCurrentLine() {
             lineColor = QColor(62, 61, 50);
         else if (m_theme == EditorTheme::SolarizedDark)
             lineColor = QColor(7, 54, 66);
-        else // Nord
+        else if (m_theme == EditorTheme::Nord)
             lineColor = QColor(59, 66, 82);
+        else if (m_theme == EditorTheme::Dracula)
+            lineColor = QColor(68, 71, 90);       // Current Line Highlight
+        else if (m_theme == EditorTheme::OneDark)
+            lineColor = QColor(44, 49, 58);       // Highlight Line
+        else if (m_theme == EditorTheme::GitHubDark)
+            lineColor = QColor(22, 27, 34);       // Accent Background Line
+        else if (m_theme == EditorTheme::Coffee)
+            lineColor = QColor(232, 222, 210);
 
         selection.format.setBackground(lineColor);
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -121,9 +145,21 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     } else if (m_theme == EditorTheme::SolarizedDark) {
         sidebarBg = QColor(7, 54, 66);
         textColor = QColor(88, 110, 117);
-    } else { // Nord
+    } else if (m_theme == EditorTheme::Nord) {
         sidebarBg = QColor(59, 66, 82);
         textColor = QColor(76, 86, 106);
+    } else if (m_theme == EditorTheme::Dracula) {
+        sidebarBg = QColor(40, 42, 54);
+        textColor = QColor(98, 114, 164);
+    } else if (m_theme == EditorTheme::OneDark) {
+        sidebarBg = QColor(40, 44, 52);
+        textColor = QColor(75, 83, 98);
+    } else if (m_theme == EditorTheme::GitHubDark) {
+        sidebarBg = QColor(13, 17, 23);
+        textColor = QColor(110, 118, 129);
+    } else { // Coffee
+        sidebarBg = QColor(235, 227, 218);
+        textColor = QColor(138, 122, 112);
     }
 
     painter.fillRect(event->rect(), sidebarBg);
