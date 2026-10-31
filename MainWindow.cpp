@@ -109,7 +109,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     });
 
     // Status Bar & Version Setup
-    langLabel = new QLabel(QString("Unknown"), this);
+    langLabel = new QLabel(QString(" Plain Text "), this);
     langLabel->setStyleSheet("color: gray;");
     statusBar()->addWidget(langLabel);
 
@@ -196,7 +196,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
         for (int i = 0; i < size; ++i) {
             settings.setArrayIndex(i);
             QString filePath = settings.value("filePath").toString();
-            int langInt = settings.value("language", static_cast<int>(ProgrammingLanguage::Cpp)).toInt();
+            int langInt = settings.value("language", static_cast<int>(ProgrammingLanguage::PlainText)).toInt();
             bool isFollow = settings.value("isFollowMode", false).toBool();
 
             if (!filePath.isEmpty() && QFile::exists(filePath)) {
@@ -397,6 +397,7 @@ void MainWindow::setupMenus() {
         });
     };
 
+    addLangAction(tr("Plain Text"), ProgrammingLanguage::PlainText);
     addLangAction(tr("C / C++"), ProgrammingLanguage::Cpp);
     addLangAction(tr("Python"), ProgrammingLanguage::Python);
     addLangAction(tr("Go"), ProgrammingLanguage::Go);
@@ -666,7 +667,7 @@ void MainWindow::currentTabChanged(int /* index */) {
             langLabel->setText(QString(" %1 ").arg(languageToString(hl->language())));
         }
     } else {
-        langLabel->setText(tr(" Unknown "));
+        langLabel->setText(tr(" Plain Text "));
     }
     updateStatusBarReadWrite();
 }
@@ -773,7 +774,10 @@ void MainWindow::openFileWithPath(const QString &fileName) {
     editor->setFont(currentEditorFont);
     editor->setTheme(currentTheme);
 
+    // Detect language ONCE and store it in a local variable
     ProgrammingLanguage lang = detectLanguage(fileName);
+    editor->setLanguage(lang); // Ensure editor stores the language enum
+
     applySmartTabPolicy(editor, lang);
 
     // Check indentation mismatch
@@ -796,16 +800,17 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
             if (reply == QMessageBox::Yes) {
                 content = convertIndentation(content, targetSpaces, targetWidth, fileIndent.usesSpaces, fileIndent.width);
-                editor->document()->setModified(true); // Mark modified so user knows it was changed
+                editor->document()->setModified(true);
             }
         }
     }
 
     editor->setPlainText(content);
-    editor->setProperty("filePath",fileName);
+    editor->setProperty("filePath", fileName);
 
+    // Pass the exact same 'lang' variable to the highlighter
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
-    hl->setLanguage(detectLanguage(fileName));
+    hl->setLanguage(lang);
     hl->setTheme(currentTheme);
 
     connect(editor, &CodeEditor::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
@@ -925,6 +930,7 @@ void MainWindow::closeTab(int index) {
 
 QString MainWindow::languageToString(ProgrammingLanguage lang) {
     switch (lang) {
+    case ProgrammingLanguage::PlainText: return "Plain Text";
     case ProgrammingLanguage::Cpp: return "C++";
     case ProgrammingLanguage::Python: return "Python";
     case ProgrammingLanguage::Go: return "Go";
@@ -934,7 +940,7 @@ QString MainWindow::languageToString(ProgrammingLanguage lang) {
     case ProgrammingLanguage::Xml: return "XML";
     case ProgrammingLanguage::Bash: return "Bash";
     }
-    return "Unknown";
+    return "Plain Text";
 }
 
 ProgrammingLanguage detectLanguage(const QString &fileName) {
@@ -942,7 +948,13 @@ ProgrammingLanguage detectLanguage(const QString &fileName) {
     QString ext = fileInfo.suffix().toLower();
     QString name = fileInfo.fileName().toLower();
 
-    if (ext == "cpp" || ext == "cc" || ext == "h") return ProgrammingLanguage::Cpp;
+    if (ext.isEmpty()) return ProgrammingLanguage::PlainText;
+
+    // Explicit text/log extensions
+    if (ext == "log" || ext == "txt" || ext == "out" || ext == "conf" || ext == "ini" || ext == "json" || ext == "md") {
+        return ProgrammingLanguage::PlainText;
+    }
+    if (ext == "cpp" || ext == "hpp" || ext == "cc" || ext == "c" || ext == "h") return ProgrammingLanguage::Cpp;
     if (ext == "py") return ProgrammingLanguage::Python;
     if (ext == "go") return ProgrammingLanguage::Go;
     if (ext == "js") return ProgrammingLanguage::JavaScript;
@@ -951,7 +963,7 @@ ProgrammingLanguage detectLanguage(const QString &fileName) {
     if (ext == "xml") return ProgrammingLanguage::Xml;
     if (ext == "sh" || ext == "bash" || name.startsWith("env")) return ProgrammingLanguage::Bash;
 
-    return ProgrammingLanguage::Cpp; // Default fallback
+    return ProgrammingLanguage::PlainText; // Default fallback
 }
 
 QString formatByteSize(qint64 bytes) {
@@ -1237,6 +1249,13 @@ void MainWindow::executeToolCommand(const QString &commandTemplate) {
                 CodeEditor *outputEditor = currentEditor();
                 if (!outputEditor) return;
 
+                // Set syntax as Plain Text
+                outputEditor->setLanguage(ProgrammingLanguage::PlainText);
+
+                SyntaxHighlighter *hl = new SyntaxHighlighter(outputEditor->document());
+                hl->setLanguage(ProgrammingLanguage::PlainText);
+                hl->setTheme(currentTheme);
+
                 outputEditor->setPlainText(QString::fromUtf8(finalContent));
                 outputEditor->setReadOnly(true);
                 outputEditor->document()->setModified(false);
@@ -1244,7 +1263,7 @@ void MainWindow::executeToolCommand(const QString &commandTemplate) {
 
                 // Set descriptive tab title
                 int currentIndex = tabWidget->currentIndex();
-                tabWidget->setTabText(currentIndex, tr("Output : %1").arg(cmd.section(' ', 0, 0)));
+                tabWidget->setTabText(currentIndex, tr("🖵 %1").arg(cmd.section(' ', 0, 0)));
             });
 
     // Start the process via shell
@@ -1295,6 +1314,14 @@ void MainWindow::openFileInFollowMode(const QString &filePath) {
     editor->setPlainText(in.readAll());
     editor->setReadOnly(true);
     editor->document()->setModified(false);
+
+    // Set syntax as Plain Text
+    editor->setLanguage(ProgrammingLanguage::PlainText);
+
+    SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
+    hl->setLanguage(ProgrammingLanguage::PlainText);
+    hl->setTheme(currentTheme);
+
     updateStatusBarReadWrite();
 
     // Set descriptive tab title with a indicator

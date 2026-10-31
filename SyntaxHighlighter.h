@@ -13,6 +13,7 @@ enum class EditorTheme {
 };
 
 enum class ProgrammingLanguage {
+    PlainText = 0,
     Cpp,
     Python,
     Go,
@@ -49,7 +50,7 @@ private:
     QTextCharFormat tagFormat;
 
     EditorTheme m_theme = EditorTheme::Light;
-    ProgrammingLanguage m_lang = ProgrammingLanguage::Cpp;
+    ProgrammingLanguage m_lang = ProgrammingLanguage::PlainText;
 
     void setupRules();
 };
