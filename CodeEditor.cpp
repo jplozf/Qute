@@ -261,6 +261,19 @@ void CodeEditor::setInsertSpacesForTabs(bool enabled) {
 }
 
 void CodeEditor::keyPressEvent(QKeyEvent *event) {
+    // Duplicate Line : Ctrl + Shift + Down
+    if (event->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) && event->key() == Qt::Key_Down) {
+        QTextCursor cursor = textCursor();
+        cursor.beginEditBlock();
+        cursor.select(QTextCursor::LineUnderCursor);
+        QString lineText = cursor.selectedText();
+        cursor.movePosition(QTextCursor::EndOfLine);
+        cursor.insertText("\n" + lineText);
+        cursor.endEditBlock();
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Tab && m_insertSpaces && !(event->modifiers() & Qt::ShiftModifier)) {
         // Insert soft tabs (spaces)
         QString spaces(m_tabWidth, ' ');
