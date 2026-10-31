@@ -87,6 +87,8 @@ private slots:
     void convertToSpaces();
     void convertToTabs();
 
+    void goToLine();
+
 private:
     enum { MaxRecentFiles = 5 };
     int currentTabWidth = 4;

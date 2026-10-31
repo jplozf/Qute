@@ -351,12 +351,17 @@ void MainWindow::setupMenus() {
     findAction->setIcon(QIcon(":/icons/Search.png"));
     connect(findAction, &QAction::triggered, this, &MainWindow::showFindDialog);
 
+    QAction *goToLineAction = new QAction(tr("Go to &Line..."), this);
+    goToLineAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    connect(goToLineAction, &QAction::triggered, this, &MainWindow::goToLine);
+
     QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
     editMenu->addAction(cutAction);
     editMenu->addAction(copyAction);
     editMenu->addAction(pasteAction);
     editMenu->addSeparator();
     editMenu->addAction(findAction);
+    editMenu->addAction(goToLineAction);
 
     convertToSpacesAction = new QAction(tr("Convert to &Spaces"), this);
     connect(convertToSpacesAction, &QAction::triggered, this, &MainWindow::convertToSpaces);
@@ -1579,4 +1584,77 @@ void MainWindow::checkForUpdates() {
             }
         }
     });
+}
+
+void MainWindow::goToLine() {
+    CodeEditor *editor = currentEditor();
+    if (!editor) return;
+
+    int totalLines = editor->document()->blockCount();
+    QTextCursor cursor = editor->textCursor();
+    int currentLine = cursor.blockNumber() + 1;
+
+    bool ok;
+    QString input = QInputDialog::getText(
+        this,
+        tr("Go to Line"),
+        tr("Enter line (e.g., 42, begin, end, +10, -5, 42%):"),
+        QLineEdit::Normal,
+        QString::number(currentLine),
+        &ok
+        );
+
+    if (!ok || input.isEmpty()) return;
+
+    input = input.trimmed().toLower();
+    int targetLine = currentLine;
+
+    // 1. Keywords: begin / top / end / bottom
+    if (input == "begin" || input == "top") {
+        targetLine = 1;
+    }
+    else if (input == "end" || input == "bottom") {
+        targetLine = totalLines;
+    }
+    // 2. Relative jumps: +N or -N
+    else if (input.startsWith('+') || input.startsWith('-')) {
+        bool validOffset = false;
+        int offset = input.toInt(&validOffset);
+        if (validOffset) {
+            targetLine = currentLine + offset;
+        }
+    }
+    // 3. Percentages: 42% or %42
+    else if (input.endsWith('%') || input.startsWith('%')) {
+        QString numPart = input;
+        if (numPart.endsWith('%')) numPart.chop(1);
+        if (numPart.startsWith('%')) numPart = numPart.mid(1);
+
+        bool validPercent = false;
+        double percent = numPart.trimmed().toDouble(&validPercent);
+        if (validPercent) {
+            percent = qBound(0.0, percent, 100.0);
+            targetLine = qRound((percent / 100.0) * totalLines);
+            if (targetLine < 1) targetLine = 1;
+        }
+    }
+    // 4. Absolute line number
+    else {
+        bool validNum = false;
+        int num = input.toInt(&validNum);
+        if (validNum) {
+            targetLine = num;
+        }
+    }
+
+    // Clamp the target line between 1 and totalLines to prevent out-of-bounds crashes
+    targetLine = qBound(1, targetLine, totalLines);
+
+    // Move cursor and center view
+    QTextBlock block = editor->document()->findBlockByNumber(targetLine - 1);
+    if (block.isValid()) {
+        cursor.setPosition(block.position());
+        editor->setTextCursor(cursor);
+        editor->centerCursor();
+    }
 }
