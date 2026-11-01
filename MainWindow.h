@@ -28,6 +28,7 @@
 #include <QNetworkReply>
 #include <QDesktopServices>
 #include <QFileSystemWatcher>
+#include <QSystemTrayIcon>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -106,6 +107,7 @@ private:
     enum { MaxRecentFiles = 5 };
     int currentTabWidth = 4;
     bool currentInsertSpaces = true;
+    bool currentMinimizeToTray = true;
 
     QTabWidget *tabWidget;
     FindReplaceDialog *findDialog;
@@ -176,6 +178,13 @@ private:
     QMenu *gitMenu = nullptr;
     QString getGitWorkingDir();
     void runGitCommand(const QStringList &args, const QString &successMessage, bool captureOutput = false);
+
+    QSystemTrayIcon *trayIcon = nullptr;
+    QMenu *trayMenu = nullptr;
+    bool m_minimizeToTray = true;
+    void setupSystemTray();
+    void updateTrayMenu();
+    bool m_forceQuit = false;
 };
 
 struct IndentInfo {

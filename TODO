@@ -4,8 +4,9 @@ X tabs vs spaces
 X dirty flag in tabs
 X follow mode (tail -f)
 X tools menu
-* git tracking menu
-* goto dialog
+X git tracking menu
+X goto dialog
 X bash syntax support
 X favorite files
 X check for updates
+X system tray

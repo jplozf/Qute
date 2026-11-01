@@ -151,6 +151,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     setupMenus();
     setupFavoritesMenu();
     setupToolBar();
+    setupSystemTray();
 
     // Global keyboard shortcuts for tab navigation
     // new QShortcut(QKeySystemShortcut(QKeySequence::NextChild), this, SLOT(nextTab()));
@@ -180,6 +181,9 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     }
     if (settings.contains("insertSpaces")) {
         currentInsertSpaces = settings.value("insertSpaces").toBool();
+    }
+    if (settings.contains("minimizeToTray")) {
+        currentMinimizeToTray = settings.value("minimizeToTray").toBool();
     }
 
     recentFiles = settings.value("recentFiles").toStringList();
@@ -234,43 +238,58 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
-    for (int i = 0; i < tabWidget->count(); ++i) {
-        CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
-        if (editor && editor->document()->isModified()) {
-            tabWidget->setCurrentIndex(i);
-            if (!maybeSave(editor)) {
-                event->ignore();
-                return;
+    if (currentMinimizeToTray && trayIcon && trayIcon->isVisible() && !m_forceQuit) {
+        hide();
+        event->ignore(); // Prevents application exit
+
+        trayIcon->showMessage(
+            tr("Qute"),
+            tr("Application minimized to system tray. Click the tray icon to restore."),
+            QSystemTrayIcon::Information,
+            2000
+            );
+    } else {
+        for (int i = 0; i < tabWidget->count(); ++i) {
+            CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
+            if (editor && editor->document()->isModified()) {
+                tabWidget->setCurrentIndex(i);
+                if (!maybeSave(editor)) {
+                    m_forceQuit = false;
+                    event->ignore();
+                    return;
+                }
             }
         }
+
+        QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
+        settings.setValue("geometry", saveGeometry());
+        settings.setValue("font", currentEditorFont);
+        settings.setValue("theme", static_cast<int>(currentTheme));
+        settings.setValue("recentFiles", recentFiles);
+        settings.setValue("tabWidth", currentTabWidth);
+        settings.setValue("insertSpaces", currentInsertSpaces);
+        settings.setValue("minimizeToTray", currentMinimizeToTray);
+
+        settings.beginWriteArray("OpenFiles");
+        for (int i = 0; i < tabWidget->count(); ++i) {
+            CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
+            if (!editor) continue;
+
+            QString filePath = editor->property("filePath").toString();
+            // Skip untitled/unsaved new tabs if you don't persist them
+            if (filePath.isEmpty()) continue;
+
+            settings.setArrayIndex(i);
+            settings.setValue("filePath", filePath);
+            settings.setValue("language", static_cast<int>(editor->language())); // Save language enum as int
+            settings.setValue("isFollowMode", editor->property("isFollowMode").toBool());
+        }
+        settings.endArray();
+        settings.setValue("currentIndex", tabWidget->currentIndex());
+
+        event->accept();
+        qApp->quit();
     }
-
-    QSettings settings(appConstants->getQString("ORGANIZATION_NAME"), appConstants->getQString("APPLICATION_NAME"));
-    settings.setValue("geometry", saveGeometry());
-    settings.setValue("font", currentEditorFont);
-    settings.setValue("theme", static_cast<int>(currentTheme));
-    settings.setValue("recentFiles", recentFiles);
-    settings.setValue("tabWidth", currentTabWidth);
-    settings.setValue("insertSpaces", currentInsertSpaces);
-
-    settings.beginWriteArray("OpenFiles");
-    for (int i = 0; i < tabWidget->count(); ++i) {
-        CodeEditor *editor = qobject_cast<CodeEditor*>(tabWidget->widget(i));
-        if (!editor) continue;
-
-        QString filePath = editor->property("filePath").toString();
-        // Skip untitled/unsaved new tabs if you don't persist them
-        if (filePath.isEmpty()) continue;
-
-        settings.setArrayIndex(i);
-        settings.setValue("filePath", filePath);
-        settings.setValue("language", static_cast<int>(editor->language())); // Save language enum as int
-        settings.setValue("isFollowMode", editor->property("isFollowMode").toBool());
-    }
-    settings.endArray();
-    settings.setValue("currentIndex", tabWidget->currentIndex());
-
-    event->accept();
 }
 
 void MainWindow::setupMenus() {
@@ -471,13 +490,15 @@ void MainWindow::openSettings() {
     // Grab policy from the active editor if available, otherwise fall back to globals
     int activeTabWidth = editor ? editor->tabWidth() : currentTabWidth;
     bool activeInsertSpaces = editor ? editor->insertSpacesForTabs() : currentInsertSpaces;
+    bool activeMinimizeToTray = editor ? editor->minimizeToTray() : currentMinimizeToTray;
 
-    SettingsDialog dialog(currentEditorFont, currentTheme, activeTabWidth, activeInsertSpaces, this);
+    SettingsDialog dialog(currentEditorFont, currentTheme, activeTabWidth, activeInsertSpaces, activeMinimizeToTray, this);
     if (dialog.exec() == QDialog::Accepted) {
         currentEditorFont = dialog.getSelectedFont();
         currentTheme = dialog.getSelectedTheme();
         currentTabWidth = dialog.getTabWidth();
         currentInsertSpaces = dialog.getInsertSpaces();
+        currentMinimizeToTray = dialog.getMinimizeToTray();
 
         applySettingsToAllEditors();
     }
@@ -678,6 +699,7 @@ void MainWindow::currentTabChanged(int /* index */) {
         langLabel->setText(tr(" Plain Text "));
     }
     updateStatusBarReadWrite();
+    updateTrayMenu();
 }
 
 void MainWindow::documentModified(bool modified) {
@@ -750,6 +772,7 @@ void MainWindow::newFile() {
     int index = tabWidget->addTab(editor, tr("Untitled*"));
     tabWidget->setCurrentIndex(index);
     updateCursorPosition();
+    updateTrayMenu();
 }
 
 void MainWindow::openFile() {
@@ -763,6 +786,7 @@ void MainWindow::openFile() {
         }
         openFileWithPath(fileName);
     }
+    updateTrayMenu();
 }
 
 void MainWindow::openFileWithPath(const QString &fileName) {
@@ -830,6 +854,7 @@ void MainWindow::openFileWithPath(const QString &fileName) {
     updateCursorPosition();
 
     addToRecentFiles(fileName);
+    updateTrayMenu();
 }
 
 void MainWindow::saveFile() {
@@ -914,6 +939,7 @@ bool MainWindow::maybeSave(CodeEditor *editor) {
 
 void MainWindow::closeCurrentTab() {
     closeTab(tabWidget->currentIndex());
+    updateTrayMenu();
 }
 
 void MainWindow::closeTab(int index) {
@@ -934,6 +960,7 @@ void MainWindow::closeTab(int index) {
     if (tabWidget->count() == 0) {
         newFile();
     }
+    updateTrayMenu();
 }
 
 QString MainWindow::languageToString(ProgrammingLanguage lang) {
@@ -1857,4 +1884,74 @@ void MainWindow::doGitClone() {
     if (ok && !url.isEmpty()) {
         runGitCommand({"clone", url}, tr("Repository cloned successfully."));
     }
+}
+
+void MainWindow::setupSystemTray() {
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
+
+    trayIcon = new QSystemTrayIcon(this);
+    // Use application window icon or fallback system icon
+    trayIcon->setIcon(windowIcon().isNull() ? style()->standardIcon(QStyle::SP_ComputerIcon) : windowIcon());
+
+    trayMenu = new QMenu(this);
+    updateTrayMenu();
+
+    trayIcon->setContextMenu(trayMenu);
+
+    // Left-click or double-click restores/hides the main window
+    connect(trayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
+            if (isVisible()) {
+                hide();
+            } else {
+                show();
+                raise();
+                activateWindow();
+            }
+        }
+    });
+
+    trayIcon->show();
+}
+
+void MainWindow::updateTrayMenu() {
+    if (!trayMenu) return;
+    trayMenu->clear();
+
+    // 1. Dynamic Open Files Submenu / List
+    int count = tabWidget->count();
+    if (count > 0) {
+        QMenu *filesMenu = trayMenu->addMenu(tr("Open Files"));
+        for (int i = 0; i < count; ++i) {
+            QString title = tabWidget->tabText(i);
+            QAction *fileAction = filesMenu->addAction(title);
+            connect(fileAction, &QAction::triggered, this, [this, i]() {
+                tabWidget->setCurrentIndex(i);
+                show();
+                raise();
+                activateWindow();
+            });
+        }
+        trayMenu->addSeparator();
+    }
+
+    // 2. New File Option
+    QAction *newAction = trayMenu->addAction(tr("New File"));
+    connect(newAction, &QAction::triggered, this, [this]() {
+        newFile();
+        show();
+        raise();
+        activateWindow();
+    });
+
+    trayMenu->addSeparator();
+
+    // 3. Quit Option (Forces full exit bypassing tray check)
+    QAction *quitAction = trayMenu->addAction(tr("Quit Qute"));
+    connect(quitAction, &QAction::triggered, this, [this]() {
+        // Disconnect or set flag so closeEvent allows termination
+        m_minimizeToTray = false;
+        m_forceQuit = true;
+        close();
+    });
 }

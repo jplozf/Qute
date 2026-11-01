@@ -5,8 +5,8 @@
 #include <QFontDialog>
 #include <QDialogButtonBox>
 
-SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidth, bool insertSpaces, QWidget *parent)
-    : QDialog(parent), m_font(font), m_theme(theme), m_tabWidth(tabWidth), m_insertSpaces(insertSpaces)
+SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidth,  bool insertSpaces,bool minimizeToTray,QWidget *parent)
+    : QDialog(parent), m_font(font), m_theme(theme), m_tabWidth(tabWidth), m_insertSpaces(insertSpaces), m_minimizeToTray(minimizeToTray)
 {
     setWindowTitle(tr("Preferences"));
     resize(440, 260);
@@ -40,6 +40,11 @@ SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidt
     insertSpacesCheckBox->setChecked(m_insertSpaces);
     formLayout->addRow(QString(), insertSpacesCheckBox);
 
+    // Minimize to Tray Checkbox
+    minimizeToTrayCheckBox = new QCheckBox(tr("Minimize to system tray on close"), this);
+    minimizeToTrayCheckBox->setChecked(m_minimizeToTray);
+    formLayout->addRow(QString(), minimizeToTrayCheckBox);
+
     mainLayout->addLayout(formLayout);
     mainLayout->addStretch();
 
@@ -70,4 +75,8 @@ int SettingsDialog::getTabWidth() const {
 
 bool SettingsDialog::getInsertSpaces() const {
     return insertSpacesCheckBox->isChecked();
+}
+
+bool SettingsDialog::getMinimizeToTray() const {
+    return minimizeToTrayCheckBox->isChecked();
 }
