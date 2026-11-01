@@ -89,6 +89,19 @@ private slots:
 
     void goToLine();
 
+    void setupGitMenu();
+    void doGitStatus();
+    void doGitLog();
+    void doGitAddAll();
+    void doGitCommit();
+    void doGitPush();
+    void doGitCommitPush();
+    void doGitFetch();
+    void doGitPull();
+    void doGitInit();
+    void doGitBang();
+    void doGitClone();
+
 private:
     enum { MaxRecentFiles = 5 };
     int currentTabWidth = 4;
@@ -159,6 +172,10 @@ private:
     void checkForUpdates();
     QNetworkAccessManager *updateManager = nullptr;
     QFileSystemWatcher *toolsWatcher = nullptr;
+
+    QMenu *gitMenu = nullptr;
+    QString getGitWorkingDir();
+    void runGitCommand(const QStringList &args, const QString &successMessage, bool captureOutput = false);
 };
 
 struct IndentInfo {

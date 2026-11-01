@@ -415,6 +415,9 @@ void MainWindow::setupMenus() {
     // Tools Menu
     setupToolsMenu();
 
+    // Git Menu
+    setupGitMenu();
+
     // View Menu Actions (Zoom In / Zoom Out)
     zoomInAction = new QAction(tr("Zoom &In"), this);
     zoomInAction->setShortcut(QKeySequence::ZoomIn);
@@ -1656,5 +1659,202 @@ void MainWindow::goToLine() {
         cursor.setPosition(block.position());
         editor->setTextCursor(cursor);
         editor->centerCursor();
+    }
+}
+
+QString MainWindow::getGitWorkingDir() {
+    CodeEditor *editor = currentEditor();
+    if (editor) {
+        // Get the full file path from your editor or window tracker
+        QString filePath = editor->property("filePath").toString(); // or your specific file path getter
+
+        if (!filePath.isEmpty()) {
+            QFileInfo fileInfo(filePath);
+            // .absolutePath() correctly returns just the directory (e.g. /home/jpl/Projets/Go/jplozf/bled)
+            return fileInfo.absolutePath();
+        }
+    }
+    return QDir::currentPath();
+}
+
+void MainWindow::runGitCommand(const QStringList &args, const QString &successMessage, bool captureOutput) {
+    QString workDir = getGitWorkingDir();
+    // Open a new editor tab for the output
+    newFile();
+    CodeEditor *outputEditor = currentEditor();
+    if (!outputEditor) return;
+
+    // Set syntax as Plain Text
+    outputEditor->setLanguage(ProgrammingLanguage::PlainText);
+
+    SyntaxHighlighter *hl = new SyntaxHighlighter(outputEditor->document());
+    hl->setLanguage(ProgrammingLanguage::PlainText);
+    hl->setTheme(currentTheme);
+
+    outputEditor->setReadOnly(true);
+    outputEditor->document()->setModified(false);
+    updateStatusBarReadWrite(); // Reflect RO status immediately
+
+    // Set descriptive tab title
+    int currentIndex = tabWidget->currentIndex();
+    tabWidget->setTabText(currentIndex, tr("🖵 git %1").arg(args.join(" ")));
+
+
+    if (outputEditor) {
+        outputEditor->appendPlainText(QString("\n[Git] $ git %1\n").arg(args.join(" ")));
+    }
+
+    QProcess *process = new QProcess(this);
+    process->setWorkingDirectory(workDir);
+
+    connect(process, &QProcess::readyReadStandardOutput, this, [this, outputEditor, process]() {
+        QString out = QString::fromUtf8(process->readAllStandardOutput());
+        if (outputEditor) outputEditor->appendPlainText(out);
+    });
+
+    connect(process, &QProcess::readyReadStandardError, this, [this, outputEditor, process]() {
+        QString err = QString::fromUtf8(process->readAllStandardError());
+        if (outputEditor) outputEditor->appendPlainText(err);
+    });
+
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, outputEditor, successMessage, process](int exitCode, QProcess::ExitStatus) {
+                if (exitCode == 0) {
+                    if (!successMessage.isEmpty() && outputEditor) {
+                        outputEditor->appendPlainText(QString("[Git Success] %1\n").arg(successMessage));
+                    }
+                } else {
+                    if (outputEditor) {
+                        outputEditor->appendPlainText(QString("[Git Error] Process exited with code %1\n").arg(exitCode));
+                    }
+                }
+                if (outputEditor && outputEditor->document()) {
+                    outputEditor->document()->setModified(false);
+                }
+                process->deleteLater();
+            });
+
+    // Check working Directory
+    if (!QDir(workDir).exists()) {
+        if (outputEditor) {
+            outputEditor->appendPlainText(tr("[Error] Working directory does not exist: %1\n").arg(workDir));
+        }
+        process->deleteLater();
+        return;
+    }
+
+    // Find absolute path to git executable if not in inherited PATH
+    QString gitPath = QStandardPaths::findExecutable("git");
+    if (gitPath.isEmpty()) {
+        // Common fallback paths on Linux
+        if (QFile::exists("/usr/bin/git")) gitPath = "/usr/bin/git";
+        else if (QFile::exists("/usr/local/bin/git")) gitPath = "/usr/local/bin/git";
+        else gitPath = "git"; // Last resort
+    }
+
+    process->start(gitPath, args);
+    if (!process->waitForStarted(3000)) {
+        if (outputEditor) {
+            outputEditor->appendPlainText(tr("[Error] Failed to start git process.\nPath: %1\nWorking Dir: %2\nReason: %3\n")
+                                              .arg(gitPath, workDir, process->errorString()));
+        }
+        process->deleteLater();
+        return;
+    }
+}
+
+void MainWindow::setupGitMenu() {
+    if (!gitMenu) {
+        gitMenu = menuBar()->addMenu(tr("&Git"));
+    } else {
+        gitMenu->clear();
+    }
+
+    struct GitActionItem {
+        QString label;
+        void (MainWindow::*handler)();
+    };
+
+    QList<GitActionItem> entries = {
+        {tr("Status"), &MainWindow::doGitStatus},
+        {tr("Log"), &MainWindow::doGitLog},
+        {tr("Add all (.)"), &MainWindow::doGitAddAll},
+        {tr("Commit"), &MainWindow::doGitCommit},
+        {tr("Push"), &MainWindow::doGitPush},
+        {tr("Commit && Push"), &MainWindow::doGitCommitPush},
+        {tr("Fetch"), &MainWindow::doGitFetch},
+        {tr("Pull (Fetch && Merge)"), &MainWindow::doGitPull},
+        {tr("Initialize"), &MainWindow::doGitInit},
+        {tr("Initialize && Push"), &MainWindow::doGitBang},
+        {tr("Clone"), &MainWindow::doGitClone}
+    };
+
+    for (const auto &entry : entries) {
+        QAction *action = gitMenu->addAction(entry.label);
+        connect(action, &QAction::triggered, this, entry.handler);
+    }
+}
+
+void MainWindow::doGitStatus() { runGitCommand({"status"}, "", true); }
+void MainWindow::doGitLog() { runGitCommand({"log", "-n", "30", "--oneline"}, "", true); }
+void MainWindow::doGitAddAll() { runGitCommand({"add", "."}, tr("Staged all changes (.)")); }
+
+void MainWindow::doGitCommit() {
+    bool ok;
+    QString msg = QInputDialog::getText(this, tr("Git Commit"), tr("Commit message:"), QLineEdit::Normal, "", &ok);
+    if (ok && !msg.isEmpty()) {
+        runGitCommand({"commit", "-m", msg}, tr("Changes committed successfully."));
+    }
+}
+
+void MainWindow::doGitPush() { runGitCommand({"push"}, tr("Pushed to remote successfully.")); }
+
+void MainWindow::doGitCommitPush() {
+    bool ok;
+    QString msg = QInputDialog::getText(this, tr("Git Commit & Push"), tr("Commit message:"), QLineEdit::Normal, "", &ok);
+    if (ok && !msg.isEmpty()) {
+        QString workDir = getGitWorkingDir();
+        QProcess proc;
+        proc.setWorkingDirectory(workDir);
+        proc.start("git", {"add", "."});
+        proc.waitForFinished();
+        proc.start("git", {"commit", "-m", msg});
+        proc.waitForFinished();
+        proc.start("git", {"push"});
+        proc.waitForFinished();
+        QMessageBox::information(this, tr("Git"), tr("Commit and Push sequence completed."));
+    }
+}
+
+void MainWindow::doGitFetch() { runGitCommand({"fetch"}, tr("Fetched latest updates from remote.")); }
+void MainWindow::doGitPull() { runGitCommand({"pull"}, tr("Pulled and merged remote changes.")); }
+void MainWindow::doGitInit() { runGitCommand({"init"}, tr("Initialized empty Git repository.")); }
+
+void MainWindow::doGitBang() {
+    bool ok;
+    QString remoteUrl = QInputDialog::getText(this, tr("Initialize & Push"), tr("Remote repository URL:"), QLineEdit::Normal, "", &ok);
+    if (ok && !remoteUrl.isEmpty()) {
+        QString workDir = getGitWorkingDir();
+        QProcess proc;
+        proc.setWorkingDirectory(workDir);
+        proc.start("git", {"init"});
+        proc.waitForFinished();
+        proc.start("git", {"remote", "add", "origin", remoteUrl});
+        proc.waitForFinished();
+        proc.start("git", {"add", "."});
+        proc.waitForFinished();
+        proc.start("git", {"commit", "-m", "Initial commit"});
+        proc.waitForFinished();
+        proc.start("git", {"push", "-u", "origin", "main"});
+        proc.waitForFinished();
+        QMessageBox::information(this, tr("Git"), tr("Repository initialized and pushed successfully."));
+    }
+}
+
+void MainWindow::doGitClone() {
+    bool ok;
+    QString url = QInputDialog::getText(this, tr("Git Clone"), tr("Repository URL to clone:"), QLineEdit::Normal, "", &ok);
+    if (ok && !url.isEmpty()) {
+        runGitCommand({"clone", url}, tr("Repository cloned successfully."));
     }
 }
