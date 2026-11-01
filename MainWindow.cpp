@@ -448,9 +448,16 @@ void MainWindow::setupMenus() {
     zoomOutAction->setIcon(QIcon(":/icons/Zoom Out.png"));
     connect(zoomOutAction, &QAction::triggered, this, &MainWindow::zoomOut);
 
+    // Full Screen Action
+    QAction *fullScreenAction = new QAction(tr("Toggle Full Screen"), this);
+    fullScreenAction->setShortcut(QKeySequence::FullScreen); // Automatically binds to F11
+    connect(fullScreenAction, &QAction::triggered, this, &MainWindow::toggleFullScreen);
+    addAction(fullScreenAction); // Ensures the shortcut works globally in the window
+
     QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(zoomInAction);
     viewMenu->addAction(zoomOutAction);
+    viewMenu->addAction(fullScreenAction);
 
     // Settings Menu
     QMenu *settingsMenu = menuBar()->addMenu(tr("&Settings"));
@@ -1918,7 +1925,7 @@ void MainWindow::updateTrayMenu() {
     if (!trayMenu) return;
     trayMenu->clear();
 
-    // 1. Dynamic Open Files Submenu / List
+    // Dynamic Open Files Submenu / List
     int count = tabWidget->count();
     if (count > 0) {
         QMenu *filesMenu = trayMenu->addMenu(tr("Open Files"));
@@ -1935,7 +1942,7 @@ void MainWindow::updateTrayMenu() {
         trayMenu->addSeparator();
     }
 
-    // 2. New File Option
+    // New File Option
     QAction *newAction = trayMenu->addAction(tr("New File"));
     connect(newAction, &QAction::triggered, this, [this]() {
         newFile();
@@ -1946,7 +1953,7 @@ void MainWindow::updateTrayMenu() {
 
     trayMenu->addSeparator();
 
-    // 3. Quit Option (Forces full exit bypassing tray check)
+    // Quit Option (Forces full exit bypassing tray check)
     QAction *quitAction = trayMenu->addAction(tr("Quit Qute"));
     connect(quitAction, &QAction::triggered, this, [this]() {
         // Disconnect or set flag so closeEvent allows termination
@@ -1954,4 +1961,12 @@ void MainWindow::updateTrayMenu() {
         m_forceQuit = true;
         close();
     });
+}
+
+void MainWindow::toggleFullScreen() {
+    if (isFullScreen()) {
+        showNormal(); // Restores previous window geometry/state
+    } else {
+        showFullScreen(); // Expands to full screen
+    }
 }

@@ -103,6 +103,8 @@ private slots:
     void doGitBang();
     void doGitClone();
 
+    void toggleFullScreen();
+
 private:
     enum { MaxRecentFiles = 5 };
     int currentTabWidth = 4;
