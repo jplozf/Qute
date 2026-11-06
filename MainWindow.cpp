@@ -49,6 +49,8 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
         QAction *addToFavAction = tabMenu.addAction(tr("Add to Favorites"));
         tabMenu.addSeparator();
         QAction *closeAllAction = tabMenu.addAction(tr("Close All Tabs"));
+        QAction *closeOutputsAction = tabMenu.addAction(tr("Close All Output Tabs"));
+        connect(closeOutputsAction, &QAction::triggered, this, &MainWindow::closeAllOutputTabs);
 
         // Execute menu at cursor position
         QAction *selectedAction = tabMenu.exec(QCursor::pos());
@@ -2106,5 +2108,20 @@ void MainWindow::jumpToSelectedFunction(int index) {
         editor->setTextCursor(cursor);
         editor->centerCursor(); // Center the line in the viewport
         editor->setFocus();
+    }
+}
+
+void MainWindow::closeAllOutputTabs() {
+    // Iterate backwards to safely remove tabs without invalidating indices
+    for (int i = tabWidget->count() - 1; i >= 0; --i) {
+        QWidget *widget = tabWidget->widget(i);
+        // Check if the tab is tagged as an output tab
+        if (widget && tabWidget->tabText(i).startsWith("🖵 ")) {
+            // Remove the tab from the widget container
+            tabWidget->removeTab(i);
+
+            // Schedule the widget for safe deletion
+            widget->deleteLater();
+        }
     }
 }

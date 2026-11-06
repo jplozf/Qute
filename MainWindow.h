@@ -146,6 +146,7 @@ private:
     QAction *printAction;
     QAction *convertToSpacesAction;
     QAction *convertToTabsAction;
+    QAction *closeOutputsAction;
 
     void setupFavoritesMenu();
     void addToFavorites(const QString &filePath, bool isFollowMode);
@@ -192,6 +193,7 @@ private:
     void updateFunctionOutline();
     void jumpToSelectedFunction(int index);
     QTimer *m_outlineUpdateTimer;
+    void closeAllOutputTabs();
 };
 
 struct IndentInfo {
