@@ -20,6 +20,12 @@
 MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     : QMainWindow(parent), tabWidget(new QTabWidget(this)), findDialog(nullptr), currentTheme(EditorTheme::Light)
 {
+    m_outlineUpdateTimer = new QTimer(this);
+    m_outlineUpdateTimer->setSingleShot(true);
+    m_outlineUpdateTimer->setInterval(400); // Wait 400ms after last keystroke
+
+    connect(m_outlineUpdateTimer, &QTimer::timeout, this, &MainWindow::updateFunctionOutline);
+
     appConstants = new Constants();
 
     setCentralWidget(tabWidget);
@@ -535,6 +541,19 @@ void MainWindow::setupToolBar() {
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolBar->addWidget(spacer);
 
+    m_functionComboBox = new QComboBox(this);
+    m_functionComboBox->setMinimumWidth(200);
+    m_functionComboBox->setPlaceholderText(tr("Outline..."));
+    toolBar->addWidget(m_functionComboBox);
+
+    // Connect selection signal to jump function
+    connect(m_functionComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::jumpToSelectedFunction);
+
+    QWidget *gap = new QWidget(this);
+    gap->setFixedWidth(10); // Adjust this value to make the gap larger or smaller
+    toolBar->addWidget(gap);
+
     QLabel *logoLabel = new QLabel(this);
     QPixmap logoPix(":/icons/Qute_icon.png");
     if (!logoPix.isNull()) {
@@ -707,6 +726,7 @@ void MainWindow::currentTabChanged(int /* index */) {
     }
     updateStatusBarReadWrite();
     updateTrayMenu();
+    updateFunctionOutline();
 }
 
 void MainWindow::documentModified(bool modified) {
@@ -775,6 +795,9 @@ void MainWindow::newFile() {
 
     connect(editor, &CodeEditor::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
     connect(editor->document(), &QTextDocument::modificationChanged, this, &MainWindow::documentModified);
+    connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+        m_outlineUpdateTimer->start(); // Restarts the countdown on every keystroke
+    });
 
     int index = tabWidget->addTab(editor, tr("Untitled*"));
     tabWidget->setCurrentIndex(index);
@@ -854,6 +877,9 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
     connect(editor, &CodeEditor::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
     connect(editor->document(), &QTextDocument::modificationChanged, this, &MainWindow::documentModified);
+    connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+        m_outlineUpdateTimer->start(); // Restarts the countdown on every keystroke
+    });
 
     int index = tabWidget->addTab(editor, strippedName(fileName));
     tabWidget->setTabToolTip(index, fileName);
@@ -862,6 +888,7 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
     addToRecentFiles(fileName);
     updateTrayMenu();
+    updateFunctionOutline();
 }
 
 void MainWindow::saveFile() {
@@ -1968,5 +1995,116 @@ void MainWindow::toggleFullScreen() {
         showNormal(); // Restores previous window geometry/state
     } else {
         showFullScreen(); // Expands to full screen
+    }
+}
+
+void MainWindow::updateFunctionOutline() {
+    m_functionComboBox->blockSignals(true);
+    m_functionComboBox->clear();
+    m_functionComboBox->addItem(tr("-- Functions --"), -1);
+
+    // Structure to hold function info for sorting
+    struct FunctionItem {
+        QString name;
+        int blockNumber;
+    };
+
+    QList<FunctionItem> foundFunctions;
+
+    CodeEditor *editor = currentEditor();
+    if (!editor) {
+        m_functionComboBox->blockSignals(false);
+        return;
+    }
+
+    ProgrammingLanguage lang = editor->language();
+    QTextDocument *doc = editor->document();
+
+    QRegularExpression cppRegex(R"(^\s*(?:[\w\s\*&:<>,~]+?\s+)?([a-zA-Z_]\w*(?:::\w+)?)\s*\([^;]*\)\s*(?:const)?\s*(?:noexcept)?\s*(?:\{|$))");
+    QRegularExpression goRegex(R"(^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)\s*\()");
+    QRegularExpression pyRegex(R"(^\s*(?:async\s+)?def\s+([a-zA-Z_]\w*)\s*\()");
+    QRegularExpression jsRegex(R"(^\s*(?:async\s+)?(?:function\s+([a-zA-Z_]\w*)|([a-zA-Z_]\w*)\s*[:=]\s*(?:async\s+)?(?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>|([a-zA-Z_]\w*)\s*\([^)]*\)\s*\{))");
+
+    // Iterate through document blocks (physical lines) instead of split strings
+    for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
+        int blockNumber = block.blockNumber(); // 0-based physical line index
+        QString line = block.text().trimmed();
+        QString funcName;
+
+        if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*") || line.startsWith("#")) {
+            continue;
+        }
+
+        if (lang == ProgrammingLanguage::Python) {
+            QRegularExpressionMatch match = pyRegex.match(line);
+            if (match.hasMatch()) funcName = match.captured(1);
+        }
+        else if (lang == ProgrammingLanguage::JavaScript) {
+            QRegularExpressionMatch match = jsRegex.match(line);
+            if (match.hasMatch()) {
+                for (int g = 1; g <= match.lastCapturedIndex(); ++g) {
+                    if (!match.captured(g).isEmpty()) {
+                        funcName = match.captured(g);
+                        break;
+                    }
+                }
+            }
+        }
+        else if (lang == ProgrammingLanguage::Go) {
+            QRegularExpressionMatch match = goRegex.match(line);
+            if (match.hasMatch()) funcName = match.captured(1);
+        }
+        else { // C / C++
+            if (line.contains("(") && line.contains(")") && !line.contains(";")) {
+                QRegularExpressionMatch match = cppRegex.match(line);
+                if (match.hasMatch()) {
+                    funcName = match.captured(1);
+                    if (funcName == "if" || funcName == "while" || funcName == "for" ||
+                        funcName == "switch" || funcName == "catch" || funcName == "return" ||
+                        funcName == "sizeof" || funcName == "decltype") {
+                        funcName.clear();
+                    }
+                }
+            }
+        }
+
+        if (!funcName.isEmpty()) {
+            foundFunctions.append({funcName, blockNumber});
+        }
+    }
+
+    // Sort alphabetically by function name (case-insensitive)
+    std::sort(foundFunctions.begin(), foundFunctions.end(), [](const FunctionItem &a, const FunctionItem &b) {
+        return QString::compare(a.name, b.name, Qt::CaseInsensitive) < 0;
+    });
+
+    // Populate the combobox with the sorted items
+    for (const auto &func : foundFunctions) {
+        m_functionComboBox->addItem(func.name, func.blockNumber);
+    }
+
+    m_functionComboBox->blockSignals(false);
+}
+
+void MainWindow::jumpToSelectedFunction(int index) {
+    if (index <= 0) return; // Skip the "-- Functions --" header
+
+    int blockNumber = m_functionComboBox->itemData(index).toInt();
+    if (blockNumber < 0) return;
+
+    CodeEditor *editor = currentEditor();
+    if (!editor) return;
+
+    // Retrieve the exact document block by its absolute index
+    QTextDocument *doc = editor->document();
+    QTextBlock targetBlock = doc->findBlockByNumber(blockNumber);
+
+    if (targetBlock.isValid()) {
+        // Create a cursor at the very beginning of that block
+        QTextCursor cursor(targetBlock);
+
+        editor->setTextCursor(cursor);
+        editor->centerCursor(); // Center the line in the viewport
+        editor->setFocus();
     }
 }

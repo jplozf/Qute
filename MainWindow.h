@@ -29,6 +29,7 @@
 #include <QDesktopServices>
 #include <QFileSystemWatcher>
 #include <QSystemTrayIcon>
+#include <QRegularExpression>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -187,6 +188,10 @@ private:
     void setupSystemTray();
     void updateTrayMenu();
     bool m_forceQuit = false;
+    QComboBox *m_functionComboBox;
+    void updateFunctionOutline();
+    void jumpToSelectedFunction(int index);
+    QTimer *m_outlineUpdateTimer;
 };
 
 struct IndentInfo {
