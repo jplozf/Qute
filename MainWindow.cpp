@@ -253,7 +253,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         trayIcon->showMessage(
             tr("Qute"),
             tr("Application minimized to system tray. Click the tray icon to restore."),
-            QSystemTrayIcon::Information,
+            QIcon(":/icons/Qute_icon.png"),
             2000
             );
     } else {
@@ -333,6 +333,7 @@ void MainWindow::setupMenus() {
 
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(newAction);
+    setupTemplatesMenu(fileMenu);
     fileMenu->addAction(openAction);
 
     recentFilesMenu = fileMenu->addMenu(tr("Open &Recent"));
@@ -960,7 +961,7 @@ bool MainWindow::maybeSave(CodeEditor *editor) {
     tabName.remove('*');
 
     QMessageBox::StandardButton ret;
-    ret = QMessageBox::warning(this, tr("Qt Text Editor"),
+    ret = QMessageBox::warning(this, appConstants->getQString("APPLICATION_NAME"),
                                tr("The document '%1' has been modified.\nDo you want to save your changes?")
                                    .arg(tabName),
                                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
@@ -1764,7 +1765,7 @@ void MainWindow::runGitCommand(const QStringList &args, const QString &successMe
 
 
     if (outputEditor) {
-        outputEditor->appendPlainText(QString("\n[Git] $ git %1\n").arg(args.join(" ")));
+        outputEditor->appendPlainText(QString("[Git] $ git %1\n").arg(args.join(" ")));
     }
 
     QProcess *process = new QProcess(this);
@@ -2124,4 +2125,115 @@ void MainWindow::closeAllOutputTabs() {
             widget->deleteLater();
         }
     }
+}
+
+void MainWindow::setupTemplatesMenu(QMenu *parent) {
+    // Create the "New from Template" submenu
+    QMenu *templateMenu = parent->addMenu(tr("New &from Template"));
+
+    // Determine path: ~/.config/YourOrganization/Qute/templates
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                        + "/" + appConstants->getQString("ORGANIZATION_NAME")
+                        + "/" + appConstants->getQString("APPLICATION_NAME");
+    QDir().mkpath(configDir); // Ensure directory exists
+    QString templatesDirPath = configDir + "/templates";
+
+    QDir templatesDir(templatesDirPath);
+    if (!templatesDir.exists()) {
+        templatesDir.mkpath(".");
+        QDir(templatesDirPath + "/C").mkpath(".");
+        QFile::copy(":/templates/default_c.c", templatesDirPath + "/C/C Source Code.c");
+    }
+
+    bool foundAnyTemplates = false;
+
+    // SCAN ROOT-LEVEL TEMPLATE FILES (directly in templates/)
+    QStringList rootFiles = templatesDir.entryList(QDir::Files);
+    for (const QString &fileName : rootFiles) {
+        QString filePath = templatesDir.absoluteFilePath(fileName);
+        QFileInfo fileInfo(fileName);
+        QString displayTitle = fileInfo.fileName();
+
+        QAction *templateAction = templateMenu->addAction(displayTitle);
+        connect(templateAction, &QAction::triggered, this, [this, filePath]() {
+            loadTemplateFile(filePath);
+        });
+        foundAnyTemplates = true;
+    }
+
+    // Add a separator if we had root files and are about to add submenus
+    if (!rootFiles.isEmpty()) {
+        templateMenu->addSeparator();
+    }
+
+    // SCAN LANGUAGE SUBDIRECTORIES (e.g., C, C++, Go, Python)
+    QStringList languageFolders = templatesDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+    for (const QString &langName : languageFolders) {
+        QDir langDir(templatesDir.absoluteFilePath(langName));
+        QStringList templateFiles = langDir.entryList(QDir::Files);
+
+        if (templateFiles.isEmpty()) continue; // Skip empty folders
+
+        QMenu *langMenu = templateMenu->addMenu(langName);
+
+        for (const QString &fileName : templateFiles) {
+            QString filePath = langDir.absoluteFilePath(fileName);
+            QFileInfo fileInfo(fileName);
+            QString displayTitle = fileInfo.fileName();
+
+            QAction *templateAction = langMenu->addAction(displayTitle);
+            connect(templateAction, &QAction::triggered, this, [this, filePath]() {
+                loadTemplateFile(filePath);
+            });
+        }
+        foundAnyTemplates = true;
+    }
+
+    // If completely empty, show a disabled placeholder
+    if (!foundAnyTemplates) {
+        QAction *emptyAction = templateMenu->addAction(tr("No templates found"));
+        emptyAction->setEnabled(false);
+    }
+
+    templateMenu->addSeparator();
+
+    QAction *openFolderAction = templateMenu->addAction(tr("Open Templates Folder..."));
+    connect(openFolderAction, &QAction::triggered, this, [templatesDirPath]() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(templatesDirPath));
+    });
+}
+
+void MainWindow::loadTemplateFile(const QString &filePath) {
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Template Error"), tr("Could not read template file:\n%1").arg(filePath));
+        return;
+    }
+
+    QString templateContent = QString::fromUtf8(file.readAll());
+    file.close();
+
+    // Create a new tab with the template content
+    CodeEditor *editor = new CodeEditor(this);
+    editor->setFont(currentEditorFont);
+    editor->setTheme(currentTheme);
+
+    SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
+    hl->setTheme(currentTheme);
+
+    connect(editor, &CodeEditor::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
+    connect(editor->document(), &QTextDocument::modificationChanged, this, &MainWindow::documentModified);
+    connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+        m_outlineUpdateTimer->start(); // Restarts the countdown on every keystroke
+    });
+
+    editor->setPlainText(templateContent);
+    editor->document()->setModified(true);
+    QString title = QFileInfo(filePath).fileName();
+    int index = tabWidget->addTab(editor, title + " *");
+    tabWidget->setCurrentIndex(index);
+    tabWidget->setCurrentWidget(editor);
+    updateCursorPosition();
+    updateTrayMenu();
 }

@@ -194,6 +194,8 @@ private:
     void jumpToSelectedFunction(int index);
     QTimer *m_outlineUpdateTimer;
     void closeAllOutputTabs();
+    void setupTemplatesMenu(QMenu *parent);
+    void loadTemplateFile(const QString &filePath);
 };
 
 struct IndentInfo {
