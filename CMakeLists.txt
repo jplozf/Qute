@@ -50,6 +50,9 @@ add_executable(Qute
     SettingsDialog.h SettingsDialog.cpp
     commit_message.txt
     TODO
+    README.md
+    License.md
+    HelpDialog.h HelpDialog.cpp
 )
 
 target_link_libraries(Qute PRIVATE Qt6::Widgets Qt6::PrintSupport Qt6::Network)

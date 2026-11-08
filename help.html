@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Qute Help</title>
+<!--
+  Written for Qt's QTextBrowser (HTML 4 + CSS 2 subset), and it also renders fine in any browser.
+  No scripts, no CSS variables, no external resources. Text and background colors are left to the
+  application palette so the page follows the active theme.
+-->
+<style type="text/css">
+  body   { font-family: sans-serif; font-size: 11pt; margin: 14px 22px; }
+  h1     { font-size: 22pt; margin-bottom: 2px; }
+  h2     { font-size: 15pt; margin-top: 26px; border-bottom: 1px solid #888888; }
+  h3     { font-size: 12pt; margin-top: 16px; }
+  p.sub  { color: #888888; margin-top: 0; }
+  code, kbd { font-family: monospace; }
+  kbd    { border: 1px solid #888888; padding: 0 3px; }
+  pre    { font-family: monospace; background-color: #80808030; padding: 8px; }
+  table  { border-collapse: collapse; }
+  th, td { border: 1px solid #888888; padding: 4px 10px; text-align: left; vertical-align: top; }
+  th     { background-color: #80808030; }
+  .note  { border-left: 4px solid #888888; padding-left: 10px; }
+</style>
+</head>
+<body>
+
+<a name="top"></a>
+<h1>Qute</h1>
+<p class="sub">A lightweight tabbed text and code editor &mdash; built with C++17 and Qt 6.</p>
+
+<h2>Contents</h2>
+<ul>
+  <li><a href="#start">Getting started</a></li>
+  <li><a href="#files">Working with files</a></li>
+  <li><a href="#editing">Editing</a></li>
+  <li><a href="#languages">Languages and syntax highlighting</a></li>
+  <li><a href="#indent">Indentation</a></li>
+  <li><a href="#follow">Follow mode</a></li>
+  <li><a href="#favorites">Favorites and recent files</a></li>
+  <li><a href="#tabs">Tabs</a></li>
+  <li><a href="#statusbar">Status bar</a></li>
+  <li><a href="#settings">Preferences</a></li>
+  <li><a href="#tray">System tray</a></li>
+  <li><a href="#session">Session restore</a></li>
+  <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+  <li><a href="#cli">Command line</a></li>
+  <li><a href="#about">About and updates</a></li>
+</ul>
+
+<a name="start"></a>
+<h2>Getting started</h2>
+<p>When Qute starts, it reopens the files you had open last time. If there are none, it opens an empty
+<b>Untitled</b> tab. The window has a menu bar, a toolbar, a tab area for your documents, and a status bar.</p>
+<p>The toolbar holds shortcuts for New, Open, Open in Follow mode, Save, Save As, Print, Find / Replace,
+Zoom In, Zoom Out and Preferences. On its right side it shows the language of the current file,
+the <b>Outline</b> drop-down, the Qute logo and the version number.</p>
+
+<a name="files"></a>
+<h2>Working with files</h2>
+<table>
+  <tr><th>Action</th><th>How</th></tr>
+  <tr><td>New empty file</td><td><b>File &gt; New</b></td></tr>
+  <tr><td>New file from a template</td><td><b>File &gt; New from template</b></td></tr>
+  <tr><td>Open a file</td><td><b>File &gt; Open&hellip;</b>. If the file is already open, Qute switches to its tab.</td></tr>
+  <tr><td>Open a recent file</td><td><b>File &gt; Open Recent</b></td></tr>
+  <tr><td>Watch a file as it grows</td><td><b>File &gt; Open in Follow mode&hellip;</b> (see <a href="#follow">Follow mode</a>)</td></tr>
+  <tr><td>Save</td><td><b>File &gt; Save</b>. A new document asks you for a file name.</td></tr>
+  <tr><td>Save under another name</td><td><b>File &gt; Save As&hellip;</b></td></tr>
+  <tr><td>Print</td><td><b>File &gt; Print&hellip;</b></td></tr>
+  <tr><td>Close the current tab</td><td><b>File &gt; Close Tab</b></td></tr>
+  <tr><td>Quit</td><td><b>File &gt; Quit</b></td></tr>
+</table>
+<p>When you close a tab or quit with unsaved changes, Qute asks whether to <b>Save</b>, <b>Discard</b>
+or <b>Cancel</b>. Unsaved tabs show a <code>*</code> after their name.</p>
+
+<a name="editing"></a>
+<h2>Editing</h2>
+<h3>Cut, copy and paste</h3>
+<p>Use the <b>Edit</b> menu or the usual shortcuts.</p>
+<h3>Find / Replace</h3>
+<p>Press <kbd>Ctrl+F</kbd> (<b>Edit &gt; Find / Replace&hellip;</b>) to open the Find / Replace dialog.
+It stays open and follows the tab you are working in.</p>
+<h3>Go to line</h3>
+<p>Press <kbd>Ctrl+G</kbd> (<b>Edit &gt; Go to Line&hellip;</b>) and enter a line number.</p>
+<h3>Zoom</h3>
+<p>Use <b>View &gt; Zoom In</b> and <b>Zoom Out</b>, or the toolbar buttons, to change the size of the text in the current editor.</p>
+<h3>Full screen</h3>
+<p>Press <kbd>F11</kbd> (<b>View &gt; Toggle Full Screen</b>).</p>
+<h3>Function outline</h3>
+<p>The <b>Outline&hellip;</b> drop-down in the toolbar lists the functions found in the current file.
+Select one to jump straight to it. The list refreshes a moment after you stop typing.</p>
+
+<a name="languages"></a>
+<h2>Languages and syntax highlighting</h2>
+<p>Qute chooses the language from the file name when you open a file. To change it, use the
+<b>Language</b> menu. The current language is shown in the toolbar.</p>
+<table>
+  <tr><th>Available languages</th></tr>
+  <tr><td>Plain Text</td></tr>
+  <tr><td>C / C++</td></tr>
+  <tr><td>Python</td></tr>
+  <tr><td>Go</td></tr>
+  <tr><td>Bash</td></tr>
+  <tr><td>JavaScript</td></tr>
+  <tr><td>Java</td></tr>
+  <tr><td>HTML</td></tr>
+  <tr><td>XML</td></tr>
+</table>
+<p>The colors used for highlighting depend on the theme chosen in <a href="#settings">Preferences</a>.</p>
+
+<a name="indent"></a>
+<h2>Indentation</h2>
+<p>Each language has a default indentation policy (tabs or spaces, and a width). The current policy is shown in the
+status bar as <code>Spaces: 4</code> or <code>Tab: 4</code>.</p>
+<ul>
+  <li><b>Mismatch warning:</b> if a file you open uses a different style from your policy, Qute asks whether to
+      convert the file to the current policy.</li>
+  <li><b>Manual conversion:</b> use <b>Edit &gt; Indentation &gt; Convert to Spaces</b> or <b>Convert to Tabs</b>.</li>
+  <li><b>Policy settings:</b> the tab width and the &ldquo;insert spaces&rdquo; option are in <a href="#settings">Preferences</a>.</li>
+</ul>
+
+<a name="follow"></a>
+<h2>Follow mode</h2>
+<p>Follow mode works like <code>tail -f</code>: the document is kept up to date as the file grows, which is handy for
+log files. Start it from <b>File &gt; Open in Follow mode&hellip;</b> or the matching toolbar button.
+Followed files are restored in follow mode the next time Qute starts.</p>
+<p>The status bar shows the read/write state of the current tab.</p>
+
+<a name="favorites"></a>
+<h2>Favorites and recent files</h2>
+<ul>
+  <li><b>Add a favorite:</b> right-click a tab and choose <b>Add to Favorites</b>. The file must be saved first.
+      Files opened in follow mode are remembered as such.</li>
+  <li><b>Open a favorite:</b> use the <b>Favorites</b> menu.</li>
+  <li><b>Recent files:</b> <b>File &gt; Open Recent</b> lists the files you opened or saved lately.
+      Files that no longer exist are removed from the list.</li>
+</ul>
+
+<a name="tabs"></a>
+<h2>Tabs</h2>
+<p>Click the <b>&times;</b> on a tab to close it. Right-click a tab for more actions:</p>
+<table>
+  <tr><th>Menu item</th><th>Effect</th></tr>
+  <tr><td>Close Tab</td><td>Closes this tab.</td></tr>
+  <tr><td>Close Other Tabs</td><td>Closes every tab except this one.</td></tr>
+  <tr><td>Copy File Path</td><td>Copies the full path of the file to the clipboard.</td></tr>
+  <tr><td>Add to Favorites</td><td>Adds the file to the Favorites menu.</td></tr>
+  <tr><td>Close All Tabs</td><td>Closes all tabs. It stops if you cancel a &ldquo;save changes?&rdquo; prompt.</td></tr>
+  <tr><td>Close All Output Tabs</td><td>Closes the tabs that hold command output.</td></tr>
+</table>
+<p>Switch tabs with <kbd>Ctrl+PageDown</kbd> (next) and <kbd>Ctrl+PageUp</kbd> (previous).
+Hover over a tab to see the full path of its file.</p>
+
+<a name="statusbar"></a>
+<h2>Status bar</h2>
+<table>
+  <tr><th>Item</th><th>Meaning</th></tr>
+  <tr><td>Path (left)</td><td>Full path of the current file.</td></tr>
+  <tr><td>Size</td><td>Size of the document in a readable unit and in bytes.</td></tr>
+  <tr><td>*modified*</td><td>Shown when the document has unsaved changes.</td></tr>
+  <tr><td>Read / Write</td><td>Whether the document can be edited.</td></tr>
+  <tr><td>Percentage</td><td>Your position in the file (current line divided by total lines).</td></tr>
+  <tr><td>Spaces / Tab</td><td>Indentation policy and width.</td></tr>
+  <tr><td>Ln, Col</td><td>Line and column of the cursor.</td></tr>
+</table>
+
+<a name="settings"></a>
+<h2>Preferences</h2>
+<p>Open <b>Settings &gt; Preferences&hellip;</b> (or the gear icon in the toolbar). Changes apply to all open tabs.</p>
+<ul>
+  <li><b>Font:</b> the font and size used in editors.</li>
+  <li><b>Theme:</b> the color theme of the editor and of syntax highlighting.</li>
+  <li><b>Tab width:</b> number of columns per indentation level.</li>
+  <li><b>Insert spaces:</b> use spaces instead of tab characters when you press the Tab key.</li>
+  <li><b>Minimize to tray:</b> keep Qute running in the system tray when the window is closed.</li>
+</ul>
+
+<a name="tray"></a>
+<h2>System tray</h2>
+<p>With <i>Minimize to tray</i> enabled, closing the window hides Qute instead of quitting. Click the tray icon to bring
+the window back, or use its menu to quit. If you quit from the tray, Qute still asks about unsaved changes.</p>
+
+<a name="session"></a>
+<h2>Session restore</h2>
+<p>On exit, Qute saves your window size and position, font, theme, indentation settings, tray option, the recent-files
+list, and the list of open files with their language and follow-mode state. Unsaved <i>Untitled</i> tabs are not kept.
+If you start Qute with file names on the command line, those files are opened instead of the previous session.</p>
+
+<a name="shortcuts"></a>
+<h2>Keyboard shortcuts</h2>
+<p>Standard platform shortcuts are used. On macOS, <kbd>Ctrl</kbd> becomes <kbd>Cmd</kbd>.</p>
+<table>
+  <tr><th>Action</th><th>Shortcut</th></tr>
+  <tr><td>New file</td><td><kbd>Ctrl+N</kbd></td></tr>
+  <tr><td>Open file</td><td><kbd>Ctrl+O</kbd></td></tr>
+  <tr><td>Save</td><td><kbd>Ctrl+S</kbd></td></tr>
+  <tr><td>Save As</td><td><kbd>Ctrl+Shift+S</kbd></td></tr>
+  <tr><td>Print</td><td><kbd>Ctrl+P</kbd></td></tr>
+  <tr><td>Close tab</td><td><kbd>Ctrl+W</kbd></td></tr>
+  <tr><td>Quit</td><td><kbd>Ctrl+Q</kbd></td></tr>
+  <tr><td>Cut / Copy / Paste</td><td><kbd>Ctrl+X</kbd> / <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td></tr>
+  <tr><td>Find / Replace</td><td><kbd>Ctrl+F</kbd></td></tr>
+  <tr><td>Go to line</td><td><kbd>Ctrl+G</kbd></td></tr>
+  <tr><td>Zoom in / out</td><td><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></td></tr>
+  <tr><td>Next / previous tab</td><td><kbd>Ctrl+PageDown</kbd> / <kbd>Ctrl+PageUp</kbd></td></tr>
+  <tr><td>Full screen</td><td><kbd>F11</kbd></td></tr>
+</table>
+
+<a name="cli"></a>
+<h2>Command line</h2>
+<pre>Qute                      start with the previous session
+Qute file1.cpp notes.txt  open these files (a missing file opens as a new document)</pre>
+
+<a name="about"></a>
+<h2>About and updates</h2>
+<p>The version in the toolbar looks like <code>vX.&lt;commit count&gt;-&lt;commit hash&gt;</code>.
+Double-click it to open the <b>About</b> box. Qute checks for updates a couple of seconds after it starts.</p>
+<p>Source code and bug reports:
+<a href="https://github.com/jplozf/Qute">https://github.com/jplozf/Qute</a></p>
+
+<p><a href="#top">Back to top</a></p>
+
+</body>
+</html>

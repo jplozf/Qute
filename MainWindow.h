@@ -34,6 +34,7 @@
 #include "FindReplaceDialog.h"
 #include "constants.h"
 #include "SettingsDialog.h"
+#include "HelpDialog.h"
 
 class DoubleClickLabel : public QLabel {
     Q_OBJECT
@@ -105,6 +106,7 @@ private slots:
     void doGitClone();
 
     void toggleFullScreen();
+    void showHelpDialog();
 
 private:
     enum { MaxRecentFiles = 5 };

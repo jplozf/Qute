@@ -185,5 +185,6 @@
         <file>icons/Write.png</file>
         <file>icons/Zoom In.png</file>
         <file>icons/Zoom Out.png</file>
+        <file>help.html</file>
     </qresource>
 </RCC>

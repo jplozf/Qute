@@ -252,7 +252,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 
         trayIcon->showMessage(
             tr("Qute"),
-            tr("Application minimized to system tray. Click the tray icon to restore."),
+            tr("Application minimized to system tray.\nClick the tray icon to restore."),
             QIcon(":/icons/Qute_icon.png"),
             2000
             );
@@ -474,6 +474,10 @@ void MainWindow::setupMenus() {
     settingsAction->setIcon(QIcon(":/icons/Gear.png"));
     connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
     settingsMenu->addAction(settingsAction);
+
+    QAction *helpAction = settingsMenu->addAction(tr("&Help"));
+    helpAction->setShortcut(QKeySequence::HelpContents); // Shows "F1" next to the menu entry
+    connect(helpAction, &QAction::triggered, this, &MainWindow::showHelpDialog);
 }
 
 void MainWindow::zoomIn() {
@@ -2247,4 +2251,9 @@ void MainWindow::loadTemplateFile(const QString &filePath) {
     tabWidget->setCurrentWidget(editor);
     updateCursorPosition();
     updateTrayMenu();
+}
+
+void MainWindow::showHelpDialog() {
+    HelpDialog helpDlg(this);
+    helpDlg.exec();
 }
