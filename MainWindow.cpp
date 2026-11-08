@@ -481,6 +481,12 @@ void MainWindow::setupMenus() {
 
     QAction *updateAction = settingsMenu->addAction(tr("&Check for Updates"));
     connect(updateAction, &QAction::triggered, this, [this](){checkForUpdates(false);});
+
+    QAction *aboutAction = settingsMenu->addAction(tr("&About %1...").arg(appConstants->getQString("APPLICATION_NAME")));
+    connect(aboutAction, &QAction::triggered, this, [this]() {
+        AboutDialog aboutDlg(this);
+        aboutDlg.exec();
+    });
 }
 
 void MainWindow::zoomIn() {
@@ -588,7 +594,8 @@ void MainWindow::setupToolBar() {
     toolbarVersionLabel = new DoubleClickLabel(this);
     toolbarVersionLabel->setText(aboutText);
     connect(toolbarVersionLabel, &DoubleClickLabel::doubleClicked, this, [this]() {
-        showAboutMessage();
+        AboutDialog aboutDlg(this);
+        aboutDlg.exec();
     });
     toolbarVersionLabel->setStyleSheet("color: gray; padding: 0 4px;");
     toolBar->addWidget(toolbarVersionLabel);

@@ -35,6 +35,7 @@
 #include "constants.h"
 #include "SettingsDialog.h"
 #include "HelpDialog.h"
+#include "AboutDialog.h"
 
 class DoubleClickLabel : public QLabel {
     Q_OBJECT
