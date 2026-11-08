@@ -1434,6 +1434,7 @@ void MainWindow::openFileInFollowMode(const QString &filePath) {
     tabWidget->setTabText(currentIndex, tr("♻ %1").arg(fileInfo.fileName()));
     editor->setProperty("filePath", filePath);
     editor->setProperty("isFollowMode", true);
+    pathLabel->setText(tr(" %1").arg(editor->property("filePath").toString()));
 
     // Scroll to the very bottom initially
     editor->verticalScrollBar()->setValue(editor->verticalScrollBar()->maximum());
