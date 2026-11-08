@@ -5,8 +5,11 @@
 #include <QFontDialog>
 #include <QDialogButtonBox>
 
-SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidth,  bool insertSpaces,bool minimizeToTray,QWidget *parent)
-    : QDialog(parent), m_font(font), m_theme(theme), m_tabWidth(tabWidth), m_insertSpaces(insertSpaces), m_minimizeToTray(minimizeToTray)
+SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidth,
+                               bool insertSpaces, bool minimizeToTray, MainWindow *parent)
+    : QDialog(parent), m_font(font), m_theme(theme), m_tabWidth(tabWidth),
+    m_insertSpaces(insertSpaces), m_minimizeToTray(minimizeToTray),
+    m_mainWindow(parent)
 {
     setWindowTitle(tr("Preferences"));
     resize(440, 260);
@@ -45,6 +48,21 @@ SettingsDialog::SettingsDialog(const QFont &font, EditorTheme theme, int tabWidt
     minimizeToTrayCheckBox->setChecked(m_minimizeToTray);
     formLayout->addRow(QString(), minimizeToTrayCheckBox);
 
+    // Config File
+    confFileButton = new QPushButton(tr("Open..."), this);
+    connect(confFileButton, &QPushButton::clicked, this, &SettingsDialog::openConfFile);
+    formLayout->addRow(tr("Config File"), confFileButton);
+
+    // Tools File
+    toolsFileButton = new QPushButton(tr("Open..."), this);
+    connect(toolsFileButton, &QPushButton::clicked, this, &SettingsDialog::openToolsFile);
+    formLayout->addRow(tr("Tools File"), toolsFileButton);
+
+    // Templates Folder
+    templatesFolderButton = new QPushButton(tr("Open..."), this);
+    connect(templatesFolderButton, &QPushButton::clicked, this, &SettingsDialog::openTemplatesFolder);
+    formLayout->addRow(tr("Templates Folder"), templatesFolderButton);
+
     mainLayout->addLayout(formLayout);
     mainLayout->addStretch();
 
@@ -79,4 +97,49 @@ bool SettingsDialog::getInsertSpaces() const {
 
 bool SettingsDialog::getMinimizeToTray() const {
     return minimizeToTrayCheckBox->isChecked();
+}
+
+void SettingsDialog::openTemplatesFolder() {
+    // Determine path: ~/.config/YourOrganization/Qute/templates
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                        + "/" + m_mainWindow->appConstants->getQString("ORGANIZATION_NAME")
+                        + "/" + m_mainWindow->appConstants->getQString("APPLICATION_NAME");
+    QDir().mkpath(configDir); // Ensure directory exists
+    QString templatesDirPath = configDir + "/templates";
+    QDesktopServices::openUrl(QUrl::fromLocalFile(templatesDirPath));
+    accept();
+}
+
+void SettingsDialog::openConfFile() {
+    // Determine path: ~/.config/YourOrganization/Qute.conf
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                        + "/" + m_mainWindow->appConstants->getQString("ORGANIZATION_NAME");
+    QDir().mkpath(configDir); // Ensure directory exists
+    QString confPath = configDir + "/" + m_mainWindow->appConstants->getQString("APPLICATION_NAME") + ".conf";
+
+    m_mainWindow->openFileWithPath(confPath);
+    accept();
+}
+
+void SettingsDialog::openToolsFile() {
+    // Determine path: ~/.config/YourOrganization/Qute/tools.conf
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                        + "/" + m_mainWindow->appConstants->getQString("ORGANIZATION_NAME")
+                        + "/" + m_mainWindow->appConstants->getQString("APPLICATION_NAME");
+    QDir().mkpath(configDir); // Ensure directory exists
+    QString confPath = configDir + "/tools.conf";
+
+    // Create default tools.conf if it doesn't exist
+    if (!QFile::exists(confPath)) {
+        QFile file(confPath);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&file);
+            out << "# Define custom tools here: Menu Text : command\n";
+            out << "# Placeholders: %F (full path), %f (filename), %d (directory), %n (name without ext)\n";
+            out << "File Info : exiftool %F\n";
+            out << "Open Containing Folder : xdg-open %d\n";
+        }
+    }
+    m_mainWindow->openFileWithPath(confPath);
+    accept();
 }
