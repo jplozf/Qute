@@ -116,10 +116,10 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
         });
     });
 
-    // Status Bar & Version Setup
-    langLabel = new QLabel(QString(" Plain Text "), this);
-    langLabel->setStyleSheet("color: gray;");
-    statusBar()->addWidget(langLabel);
+    // Status Bar
+    pathLabel = new QLabel(QString(""), this);
+    pathLabel->setStyleSheet("color: gray;");
+    statusBar()->addWidget(pathLabel);
 
     // Create individual status widgets with fixed/minimum widths and panel borders
     sizeLabel = new QLabel(this);
@@ -544,6 +544,10 @@ void MainWindow::setupToolBar() {
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolBar->addWidget(spacer);
 
+    langLabel = new QLabel(QString(" Plain Text "), this);
+    langLabel->setStyleSheet("color: gray;");
+    toolBar->addWidget(langLabel);
+
     m_functionComboBox = new QComboBox(this);
     m_functionComboBox->setMinimumWidth(200);
     m_functionComboBox->setPlaceholderText(tr("Outline..."));
@@ -727,6 +731,7 @@ void MainWindow::currentTabChanged(int /* index */) {
     } else {
         langLabel->setText(tr(" Plain Text "));
     }
+    pathLabel->setText(QString(" %1").arg(editor->property("filePath").toString()));
     updateStatusBarReadWrite();
     updateTrayMenu();
     updateFunctionOutline();
@@ -830,6 +835,8 @@ void MainWindow::openFileWithPath(const QString &fileName) {
         QMessageBox::warning(this, tr("Error"), tr("Cannot read file %1:\n%2.").arg(fileName, file.errorString()));
         return;
     }
+
+    pathLabel->setText(QString(" %1").arg(fileName));
 
     QTextStream in(&file);
     QString content = in.readAll();
@@ -1601,6 +1608,7 @@ bool MainWindow::activateTabIfAlreadyOpen(const QString &filePath) {
 }
 
 void MainWindow::checkForUpdates() {
+    qDebug() << "Update Manager called";
     if (!updateManager) {
         updateManager = new QNetworkAccessManager(this);
     }
@@ -1634,6 +1642,7 @@ void MainWindow::checkForUpdates() {
         QString localShortSha = QString(GIT_HASH).trimmed();
 
         if (!localShortSha.isEmpty() && remoteShortSha != localShortSha) {
+            qDebug() << "Update found";
             QMessageBox::StandardButton replyBox = QMessageBox::information(
                 this,
                 tr("Update Available"),
@@ -1649,6 +1658,8 @@ void MainWindow::checkForUpdates() {
             if (replyBox == QMessageBox::Yes) {
                 QDesktopServices::openUrl(QUrl(commitUrl));
             }
+        } else {
+            qDebug() << "No Update available";
         }
     });
 }

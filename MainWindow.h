@@ -117,6 +117,7 @@ private:
     QFont currentEditorFont;
     EditorTheme currentTheme;
     DoubleClickLabel *toolbarVersionLabel;
+    QLabel *pathLabel;
     QLabel *langLabel;
     QLabel *sizeLabel;
     QLabel *modifiedLabel;
