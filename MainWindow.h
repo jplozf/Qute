@@ -178,7 +178,7 @@ private:
     void executeToolCommand(const QString &commandTemplate);
     QMenu *toolsMenu = nullptr;
 
-    void checkForUpdates();
+    void checkForUpdates(bool silent = true);
     QNetworkAccessManager *updateManager = nullptr;
     QFileSystemWatcher *toolsWatcher = nullptr;
 

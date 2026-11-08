@@ -242,7 +242,7 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     }
 
     // Trigger update check asynchronously 2 seconds after launch
-    QTimer::singleShot(2000, this, &MainWindow::checkForUpdates);
+    QTimer::singleShot(2000, this, [this](){checkForUpdates(true);});
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -478,6 +478,9 @@ void MainWindow::setupMenus() {
     QAction *helpAction = settingsMenu->addAction(tr("&Help"));
     helpAction->setShortcut(QKeySequence::HelpContents); // Shows "F1" next to the menu entry
     connect(helpAction, &QAction::triggered, this, &MainWindow::showHelpDialog);
+
+    QAction *updateAction = settingsMenu->addAction(tr("&Check for Updates"));
+    connect(updateAction, &QAction::triggered, this, [this](){checkForUpdates(false);});
 }
 
 void MainWindow::zoomIn() {
@@ -1611,7 +1614,7 @@ bool MainWindow::activateTabIfAlreadyOpen(const QString &filePath) {
     return false;
 }
 
-void MainWindow::checkForUpdates() {
+void MainWindow::checkForUpdates(bool silent) {
     qDebug() << "Update Manager called";
     if (!updateManager) {
         updateManager = new QNetworkAccessManager(this);
@@ -1621,7 +1624,7 @@ void MainWindow::checkForUpdates() {
     request.setHeader(QNetworkRequest::UserAgentHeader, "Qute-TextEditor");
 
     QNetworkReply *reply = updateManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, silent, reply]() {
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {
@@ -1664,6 +1667,14 @@ void MainWindow::checkForUpdates() {
             }
         } else {
             qDebug() << "No Update available";
+            if (!silent) {
+                QMessageBox::StandardButton replyBox = QMessageBox::information(
+                    this,
+                    tr("Up to date"),
+                    tr("Your version is up to date."),
+                    QMessageBox::Ok
+                    );
+            }
         }
     });
 }
