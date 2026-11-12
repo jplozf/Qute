@@ -30,6 +30,8 @@
 #include <QFileSystemWatcher>
 #include <QSystemTrayIcon>
 #include <QRegularExpression>
+#include <QStringDecoder>
+#include <QByteArray>
 #include "CodeEditor.h"
 #include "FindReplaceDialog.h"
 #include "constants.h"
@@ -128,6 +130,8 @@ private:
     QLabel *tabPolicyLabel;
     QLabel *cursorPosLabel;
     QLabel *readWriteLabel = nullptr;
+    QLabel *encodingLabel;
+    QLabel *eolLabel;
 
     QMenu *recentFilesMenu;
     QAction *recentFileActions[MaxRecentFiles];
@@ -208,8 +212,13 @@ struct IndentInfo {
     bool detected = false;
 };
 
+struct EncodingResult {
+    QString text;
+    QString name;
+};
+
 ProgrammingLanguage detectLanguage(const QString &fileName);
 QString formatByteSize(qint64 bytes);
 IndentInfo detectFileIndentation(const QString &content);
 QString convertIndentation(const QString &content, bool targetSpaces, int targetWidth, bool sourceSpaces, int sourceWidth);
-
+EncodingResult detectAndLoadText(const QByteArray &data);

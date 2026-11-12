@@ -148,11 +148,21 @@ MainWindow::MainWindow(const QStringList &commandLineFiles, QWidget *parent)
     cursorPosLabel->setMinimumWidth(110);
     cursorPosLabel->setAlignment(Qt::AlignCenter);
 
+    encodingLabel = new QLabel(this);
+    encodingLabel->setMinimumWidth(110);
+    encodingLabel->setAlignment(Qt::AlignCenter);
+
+    eolLabel = new QLabel(this);
+    eolLabel->setMinimumWidth(65);
+    eolLabel->setAlignment(Qt::AlignCenter);
+
     // Add them as permanent widgets on the right side of the status bar
     statusBar()->addPermanentWidget(sizeLabel);
     statusBar()->addPermanentWidget(modifiedLabel);
     statusBar()->addPermanentWidget(readWriteLabel);
     statusBar()->addPermanentWidget(progressLabel);
+    statusBar()->addPermanentWidget(encodingLabel);
+    statusBar()->addPermanentWidget(eolLabel);
     statusBar()->addPermanentWidget(tabPolicyLabel);
     statusBar()->addPermanentWidget(cursorPosLabel);
 
@@ -696,6 +706,8 @@ void MainWindow::updateCursorPosition() {
         progressLabel->clear();
         tabPolicyLabel->clear();
         cursorPosLabel->clear();
+        encodingLabel->clear();
+        eolLabel->clear();
         return;
     }
 
@@ -733,6 +745,12 @@ void MainWindow::updateCursorPosition() {
 
     // 5. Line and Column coordinates
     cursorPosLabel->setText(QString("Ln: %1, Col: %2 ").arg(line).arg(col));
+
+    // 6. Encoding Label
+    encodingLabel->setText(editor->property("fileEncoding").toString());
+
+    // 7. EOL Label
+    eolLabel->setText(editor->property("fileEolMode").toString());
 }
 
 void MainWindow::currentTabChanged(int /* index */) {
@@ -811,6 +829,7 @@ void MainWindow::newFile() {
     CodeEditor *editor = new CodeEditor(this);
     editor->setFont(currentEditorFont);
     editor->setTheme(currentTheme);
+    editor->setProperty("fileEncoding", "UTF-8");
 
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
     hl->setTheme(currentTheme);
@@ -852,13 +871,23 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
     pathLabel->setText(QString(" %1").arg(fileName));
 
-    QTextStream in(&file);
-    QString content = in.readAll();
+    // QTextStream in(&file);
+    QByteArray data = file.readAll();
+    // Encoding detection
+    EncodingResult loadedFile = detectAndLoadText(data);
+    QString content  = loadedFile.text;
     file.close();
+
+    QString eolMode = "LF";
+    if (content.contains("\r\n")) {
+        eolMode = "CRLF";
+    }
 
     CodeEditor *editor = new CodeEditor(this);
     editor->setFont(currentEditorFont);
     editor->setTheme(currentTheme);
+    editor->setProperty("fileEncoding", loadedFile.name);
+    editor->setProperty("fileEolMode", eolMode);
 
     // Detect language ONCE and store it in a local variable
     ProgrammingLanguage lang = detectLanguage(fileName);
@@ -933,8 +962,41 @@ void MainWindow::saveFile() {
         return;
     }
 
+    QString encName = editor->property("fileEncoding").toString();
+    if (encName.isEmpty()) {
+        encName = "UTF-8";
+    }
+    // Select the correct Qt 6 QStringEncoder based on the detected format
+    QByteArray encodedData;
+    QString textToSave = editor->toPlainText();
+
+    if (encName.startsWith("UTF-8")) {
+        QStringEncoder encoder(QStringEncoder::Utf8);
+        encodedData = encoder(textToSave);
+    }
+    else if (encName.startsWith("UTF-16LE")) {
+        QStringEncoder encoder(QStringEncoder::Utf16LE);
+        encodedData = encoder(textToSave);
+    }
+    else if (encName.startsWith("UTF-16BE")) {
+        QStringEncoder encoder(QStringEncoder::Utf16BE);
+        encodedData = encoder(textToSave);
+    }
+    else {
+        // Fallback for Latin-1, Windows-1252, or any other 8-bit encoding
+        QStringEncoder encoder(QStringEncoder::Latin1);
+        encodedData = encoder(textToSave);
+    }
+
+    // Write bytes directly to disk
+    qint64 bytesWritten = file.write(encodedData);
+    // file.close();
+
+    /*
     QTextStream out(&file);
     out << editor->toPlainText();
+    */
+
     editor->document()->setModified(false);
 
     int index = tabWidget->currentIndex();
@@ -1425,6 +1487,7 @@ void MainWindow::openFileInFollowMode(const QString &filePath) {
     editor->setPlainText(in.readAll());
     editor->setReadOnly(true);
     editor->document()->setModified(false);
+    editor->setProperty("fileEncoding", "UTF-8");
 
     // Set syntax as Plain Text
     editor->setLanguage(ProgrammingLanguage::PlainText);
@@ -2275,4 +2338,51 @@ void MainWindow::loadTemplateFile(const QString &filePath) {
 void MainWindow::showHelpDialog() {
     HelpDialog helpDlg(this);
     helpDlg.exec();
+}
+
+EncodingResult detectAndLoadText(const QByteArray &data) {
+    // 1. Check Byte Order Marks (BOM)
+    if (data.startsWith("\xEF\xBB\xBF")) {
+        auto decoder = QStringDecoder(QStringDecoder::Utf8);
+        return { decoder(data.mid(3)), "UTF-8-BOM" };
+    }
+    if (data.startsWith("\xFF\xFE")) {
+        auto decoder = QStringDecoder(QStringDecoder::Utf16LE);
+        return { decoder(data.mid(2)), "UTF-16LE" };
+    }
+    if (data.startsWith("\xFE\xFF")) {
+        auto decoder = QStringDecoder(QStringDecoder::Utf16BE);
+        return { decoder(data.mid(2)), "UTF-16BE" };
+    }
+
+    // 2. Strict UTF-8 Validation
+    auto utf8Decoder = QStringDecoder(QStringDecoder::Utf8);
+    QString utf8Text = utf8Decoder(data);
+    if (!utf8Decoder.hasError()) {
+        return { utf8Text, "UTF-8" };
+    }
+
+    // 3. Fallback list of common encodings to test in Qt 6
+    struct EncodingCandidate {
+        QStringDecoder::Encoding encoding;
+        const char *displayName;
+    };
+
+    const EncodingCandidate candidates[] = {
+        { QStringDecoder::Latin1,     "ISO-8859-1 (Latin-1)" },
+        { QStringDecoder::System,     "System / Win-1252" },
+        { QStringDecoder::Utf16,      "UTF-16" }
+    };
+
+    for (const auto &candidate : candidates) {
+        auto decoder = QStringDecoder(candidate.encoding);
+        QString decoded = decoder(data);
+        if (!decoder.hasError()) {
+            return { decoded, candidate.displayName };
+        }
+    }
+
+    // Default ultimate fallback (raw 8-bit Latin-1 decoding never throws errors)
+    auto latin1Decoder = QStringDecoder(QStringDecoder::Latin1);
+    return { latin1Decoder(data), "ISO-8859-1 (Latin-1)" };
 }

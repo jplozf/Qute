@@ -1,0 +1,9 @@
+=== Qute Test File (ISO-8859-1 / Latin-1) ===
+Ceci est un fichier texte d'essai encodé en ISO-8859-1 (Latin-1).
+Il contient des caractères accentués français :
+- Éléphant, Château, Naïf, Garçon, Ouï-dire
+- Crème brûlée, À bientôt, Déjà vu
+
+If Qute reads this file correctly with Latin-1 / ISO-8859-1 encoding,
+all accented characters above will display without errors or glyph corruption.
+
