@@ -2,13 +2,17 @@
 #include <QPainter>
 #include <QTextBlock>
 
-CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent) {
+CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_isSaving(false) {
     lineNumberArea = new LineNumberArea(this);
     setTabWidth(4);
 
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
     connect(this, &CodeEditor::cursorPositionChanged, this, &CodeEditor::highlightCurrentLine);
+
+    m_fileWatcher = new QFileSystemWatcher(this);
+    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged,
+            this, &CodeEditor::handleFileChanged);
 
     updateLineNumberAreaWidth(0);
     highlightCurrentLine();
@@ -324,4 +328,35 @@ void CodeEditor::setSearchHighlight(const QString &searchString, QTextDocument::
     m_searchString = searchString;
     m_searchFlags = flags;
     updateExtraSelections();
+}
+
+void CodeEditor::startWatchingFile(const QString &filePath) {
+    m_currentFilePath = filePath;
+    QStringList watched = m_fileWatcher->files();
+    if (!watched.isEmpty()) {
+        m_fileWatcher->removePaths(watched);
+    }
+    if (!filePath.isEmpty() && QFileInfo(filePath).exists()) {
+        m_fileWatcher->addPath(filePath);
+    }
+}
+
+void CodeEditor::stopWatchingFile() {
+    QStringList watched = m_fileWatcher->files();
+    if (!watched.isEmpty()) {
+        m_fileWatcher->removePaths(watched);
+    }
+    m_currentFilePath.clear();
+}
+
+void CodeEditor::handleFileChanged(const QString &path) {
+    // Ignore changes triggered by our own save operation
+    if (m_isSaving) return;
+
+    // Re-add path in case the file was replaced (common with atomic saves)
+    if (!m_fileWatcher->files().contains(path)) {
+        m_fileWatcher->addPath(path);
+    }
+
+    emit externalFileChanged(path);
 }

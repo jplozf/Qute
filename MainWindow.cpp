@@ -934,6 +934,45 @@ void MainWindow::openFileWithPath(const QString &fileName) {
 
     editor->setPlainText(content);
     editor->setProperty("filePath", fileName);
+    editor->startWatchingFile(fileName);
+
+    // Connect external modification signal
+    connect(editor, &CodeEditor::externalFileChanged, this, [this](const QString &path) {
+        CodeEditor *ed = qobject_cast<CodeEditor*>(sender());
+        if (!ed) return;
+
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this,
+            tr("File Modified Outside"),
+            tr("The file:\n%1\nhas been modified by another program.\n\nDo you want to reload it and lose any unsaved changes here?")
+                .arg(QFileInfo(path).fileName()),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No
+            );
+
+        if (reply == QMessageBox::Yes) {
+            ed->stopWatchingFile();
+
+            // Reload file contents using your loading logic
+            QFile file(path);
+            if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                QByteArray data = file.readAll();
+                file.close();
+
+                EncodingResult loadedFile = detectAndLoadText(data);
+                ed->setPlainText(loadedFile.text);
+                ed->setProperty("fileEncoding", loadedFile.name);
+                ed->document()->setModified(false);
+
+                // Update status bar if this is the active tab
+                if (ed == currentEditor()) {
+                    encodingLabel->setText(QString(" %1 ").arg(loadedFile.name));
+                }
+            }
+
+            ed->startWatchingFile(path); // Resume watching
+        }
+    });
 
     // Pass the exact same 'lang' variable to the highlighter
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
@@ -968,8 +1007,13 @@ void MainWindow::saveFile() {
             return;
     }
 
+    editor->setSaving(true);
+    editor->stopWatchingFile();
+
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        editor->setSaving(false);
+        editor->startWatchingFile(filePath);
         QMessageBox::warning(this, tr("Error"), tr("Cannot write file %1:\n%2.").arg(filePath, file.errorString()));
         return;
     }
@@ -1014,6 +1058,9 @@ void MainWindow::saveFile() {
     int index = tabWidget->currentIndex();
     tabWidget->setTabText(index, strippedName(filePath));
     tabWidget->setTabToolTip(index, filePath);
+
+    editor->startWatchingFile(filePath);
+    editor->setSaving(false);
 
     addToRecentFiles(filePath);
     updateCursorPosition();

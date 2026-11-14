@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QPlainTextEdit>
+#include <QFileSystemWatcher>
+#include <QMessageBox>
+#include <QFileInfo>
 #include "SyntaxHighlighter.h"
 
 class LineNumberArea;
@@ -23,6 +26,14 @@ public:
     ProgrammingLanguage language() const { return m_language; }
     void setSearchHighlight(const QString &searchString, QTextDocument::FindFlags flags);
 
+    void startWatchingFile(const QString &filePath);
+    void stopWatchingFile();
+    bool isSaving() const { return m_isSaving; }
+    void setSaving(bool saving) { m_isSaving = saving; }
+
+signals:
+    void externalFileChanged(const QString &filePath);
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
@@ -31,6 +42,7 @@ private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
+    void handleFileChanged(const QString &path);
 
 private:
     QWidget *lineNumberArea;
@@ -42,6 +54,10 @@ private:
     QString m_searchString;
     QTextDocument::FindFlags m_searchFlags;
     void updateExtraSelections();
+
+    QFileSystemWatcher *m_fileWatcher;
+    QString m_currentFilePath;
+    bool m_isSaving;
 };
 
 class LineNumberArea : public QWidget {
