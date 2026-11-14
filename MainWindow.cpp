@@ -753,7 +753,18 @@ void MainWindow::updateCursorPosition() {
     eolLabel->setText(editor->property("fileEolMode").toString());
 }
 
-void MainWindow::currentTabChanged(int /* index */) {
+void MainWindow::currentTabChanged(int index) {
+    if (index < 0 || !currentEditor()) {
+        langLabel->setText(tr(" Plain Text "));
+        pathLabel->clear();
+        encodingLabel->clear();
+        eolLabel->clear(); // If you added the EOL label
+
+        // Clear any other state (cursor pos, status bar read-write, etc.)
+        statusBar()->clearMessage();
+        return;
+    }
+
     updateCursorPosition();
     CodeEditor *editor = currentEditor();
     if (editor) {
@@ -830,6 +841,7 @@ void MainWindow::newFile() {
     editor->setFont(currentEditorFont);
     editor->setTheme(currentTheme);
     editor->setProperty("fileEncoding", "UTF-8");
+    editor->setProperty("fileEolMode", "LF");
 
     SyntaxHighlighter *hl = new SyntaxHighlighter(editor->document());
     hl->setTheme(currentTheme);
@@ -1026,6 +1038,7 @@ void MainWindow::saveAsFile() {
     out << editor->toPlainText();
     editor->document()->setModified(false);
     editor->setProperty("filePath", filePath);
+    pathLabel->setText(filePath);
 
     int index = tabWidget->currentIndex();
     tabWidget->setTabText(index, strippedName(filePath));
