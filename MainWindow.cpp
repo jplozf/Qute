@@ -1060,7 +1060,9 @@ void MainWindow::saveFile() {
     tabWidget->setTabToolTip(index, filePath);
 
     editor->startWatchingFile(filePath);
-    editor->setSaving(false);
+    QTimer::singleShot(500, editor, [editor]() {
+        editor->setSaving(false);
+    });
 
     addToRecentFiles(filePath);
     updateCursorPosition();
