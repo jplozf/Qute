@@ -1408,37 +1408,42 @@ void MainWindow::setupToolsMenu() {
             QString rawKey = line.left(colonIdx).trimmed();
             QString command = line.mid(colonIdx + 1).trimmed();
 
-            QMenu *targetMenu = toolsMenu; // Default to main Tools menu
+            // Split the path components by '/'
+            QStringList parts = rawKey.split('/');
+            for (QString &part : parts) {
+                part = part.trimmed();
+            }
 
-            // Check if the item belongs to a submenu using "/"
-            if (rawKey.contains('/')) {
-                int slashIdx = rawKey.indexOf('/');
-                QString submenuName = rawKey.left(slashIdx).trimmed();
-                QString itemName = rawKey.mid(slashIdx + 1).trimmed();
+            if (parts.isEmpty()) continue;
 
-                if (!submenuName.isEmpty() && !itemName.isEmpty()) {
-                    rawKey = itemName; // The actual action label becomes the part after "/"
+            // Traverse or create the submenu hierarchy
+            QMenu *targetMenu = toolsMenu;
 
-                    // Look for an existing submenu to avoid duplicate creations
-                    QMenu *existingSubMenu = nullptr;
-                    for (QAction *action : toolsMenu->actions()) {
-                        if (action->menu() && action->text() == submenuName) {
-                            existingSubMenu = action->menu();
-                            break;
-                        }
+            // All parts except the last one represent submenus
+            for (int i = 0; i < parts.size() - 1; ++i) {
+                QString submenuName = parts[i];
+                if (submenuName.isEmpty()) continue;
+
+                QMenu *existingSubMenu = nullptr;
+                for (QAction *action : targetMenu->actions()) {
+                    if (action->menu() && action->text() == submenuName) {
+                        existingSubMenu = action->menu();
+                        break;
                     }
+                }
 
-                    if (existingSubMenu) {
-                        targetMenu = existingSubMenu;
-                    } else {
-                        // Create a new submenu under toolsMenu
-                        targetMenu = toolsMenu->addMenu(submenuName);
-                    }
+                if (existingSubMenu) {
+                    targetMenu = existingSubMenu;
+                } else {
+                    targetMenu = targetMenu->addMenu(submenuName);
                 }
             }
 
-            // Create the action on the target menu (either root toolsMenu or a submenu)
-            QAction *action = targetMenu->addAction(rawKey);
+            // The final part is the action text itself
+            QString actionText = parts.last();
+            if (actionText.isEmpty()) continue;
+
+            QAction *action = targetMenu->addAction(actionText);
             connect(action, &QAction::triggered, this, [this, command]() {
                 executeToolCommand(command);
             });
