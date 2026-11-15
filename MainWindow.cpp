@@ -1369,9 +1369,12 @@ void MainWindow::setupToolsMenu() {
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream out(&file);
             out << "# Define custom tools here: Menu Text : command\n";
+            out << "# Submenu syntax: Submenu Name / Item Name : command\n";
             out << "# Placeholders: %F (full path), %f (filename), %d (directory), %n (name without ext)\n";
             out << "File Info : exiftool %F\n";
             out << "Open Containing Folder : xdg-open %d\n";
+            out << "Media / Play Video : vlc %F\n";
+            out << "Media / Inspect Audio : ffprobe %F\n";
         }
     }
 
@@ -1391,7 +1394,7 @@ void MainWindow::setupToolsMenu() {
         toolsWatcher->addPath(confPath);
     }
 
-    // Read tools.conf and build menu items
+    // Read tools.conf and build menu/submenu items
     QFile file(confPath);
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
@@ -1402,10 +1405,40 @@ void MainWindow::setupToolsMenu() {
             int colonIdx = line.indexOf(':');
             if (colonIdx == -1) continue;
 
-            QString menuText = line.left(colonIdx).trimmed();
+            QString rawKey = line.left(colonIdx).trimmed();
             QString command = line.mid(colonIdx + 1).trimmed();
 
-            QAction *action = toolsMenu->addAction(menuText);
+            QMenu *targetMenu = toolsMenu; // Default to main Tools menu
+
+            // Check if the item belongs to a submenu using "/"
+            if (rawKey.contains('/')) {
+                int slashIdx = rawKey.indexOf('/');
+                QString submenuName = rawKey.left(slashIdx).trimmed();
+                QString itemName = rawKey.mid(slashIdx + 1).trimmed();
+
+                if (!submenuName.isEmpty() && !itemName.isEmpty()) {
+                    rawKey = itemName; // The actual action label becomes the part after "/"
+
+                    // Look for an existing submenu to avoid duplicate creations
+                    QMenu *existingSubMenu = nullptr;
+                    for (QAction *action : toolsMenu->actions()) {
+                        if (action->menu() && action->text() == submenuName) {
+                            existingSubMenu = action->menu();
+                            break;
+                        }
+                    }
+
+                    if (existingSubMenu) {
+                        targetMenu = existingSubMenu;
+                    } else {
+                        // Create a new submenu under toolsMenu
+                        targetMenu = toolsMenu->addMenu(submenuName);
+                    }
+                }
+            }
+
+            // Create the action on the target menu (either root toolsMenu or a submenu)
+            QAction *action = targetMenu->addAction(rawKey);
             connect(action, &QAction::triggered, this, [this, command]() {
                 executeToolCommand(command);
             });
