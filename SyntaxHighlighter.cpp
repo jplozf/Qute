@@ -102,8 +102,13 @@ void SyntaxHighlighter::setupRules() {
 
     // Special Rules for HTML / XML Tags and Comments
     if (m_lang == ProgrammingLanguage::Html || m_lang == ProgrammingLanguage::Xml) {
-        // XML/HTML Tags (e.g. <div, </span, <root>)
+        // Opening/closing tag start + name (e.g. <div, </span, <br)
         rule.pattern = QRegularExpression("</?[a-zA-Z0-9_-]+");
+        rule.format = tagFormat;
+        highlightingRules.append(rule);
+
+        // Tag closing brackets (e.g. > or />)
+        rule.pattern = QRegularExpression("/?>");
         rule.format = tagFormat;
         highlightingRules.append(rule);
 
