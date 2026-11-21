@@ -265,6 +265,82 @@ void CodeEditor::setInsertSpacesForTabs(bool enabled) {
 }
 
 void CodeEditor::keyPressEvent(QKeyEvent *event) {
+    QTextCursor cursor = textCursor();
+
+    const bool isTab = (event->key() == Qt::Key_Tab) && (event->modifiers() == Qt::NoModifier);
+    const bool isBackTab = (event->key() == Qt::Key_Backtab) ||
+                           ((event->key() == Qt::Key_Tab) && (event->modifiers() & Qt::ShiftModifier));
+
+    if ((isTab || isBackTab) && cursor.hasSelection()) {
+        // Determine indent string (spaces if configured, otherwise '\t')
+        QString indentUnit = "\t";
+        if (insertSpacesForTabs()) {
+            int width = qMax(1, tabWidth());
+            indentUnit = QString(width, QLatin1Char(' '));
+        }
+
+        int selStart = cursor.selectionStart();
+        int selEnd = cursor.selectionEnd();
+
+        QTextDocument *doc = document();
+        QTextBlock startBlock = doc->findBlock(selStart);
+        QTextBlock endBlock = doc->findBlock(selEnd);
+
+        // If the selection ends right at column 0 of the next line (and isn't on the start line),
+        // don't shift that trailing line unintentionally
+        if (endBlock.blockNumber() > startBlock.blockNumber() && selEnd == endBlock.position()) {
+            endBlock = endBlock.previous();
+        }
+
+        cursor.beginEditBlock();
+
+        QTextBlock block = startBlock;
+        while (block.isValid()) {
+            QTextCursor lineCursor(block);
+            lineCursor.movePosition(QTextCursor::StartOfBlock);
+
+            if (isTab) {
+                lineCursor.insertText(indentUnit);
+            } else {
+                // Unindent: remove up to indentUnit (or up to tabWidth() leading spaces)
+                QString lineText = block.text();
+                if (lineText.startsWith(QLatin1Char('\t'))) {
+                    lineCursor.deleteChar();
+                } else if (lineText.startsWith(QLatin1Char(' '))) {
+                    int maxSpaces = insertSpacesForTabs() ? qMax(1, tabWidth()) : 4;
+                    int toRemove = 0;
+                    while (toRemove < maxSpaces && toRemove < lineText.size() &&
+                           lineText.at(toRemove) == QLatin1Char(' ')) {
+                        ++toRemove;
+                    }
+                    for (int i = 0; i < toRemove; ++i) {
+                        lineCursor.deleteChar();
+                    }
+                }
+            }
+
+            if (block == endBlock) {
+                break;
+            }
+            block = block.next();
+        }
+
+        cursor.endEditBlock();
+
+        // Restore selection spanning the affected blocks
+        QTextBlock finalEndBlock = endBlock.isValid() ? endBlock : startBlock;
+        int newStart = startBlock.position();
+        int newEnd = finalEndBlock.position() + finalEndBlock.length() - 1;
+
+        QTextCursor restoredCursor(doc);
+        restoredCursor.setPosition(newStart);
+        restoredCursor.setPosition(qMax(newStart, newEnd), QTextCursor::KeepAnchor);
+        setTextCursor(restoredCursor);
+
+        event->accept();
+        return;
+    }
+
     // Duplicate Line : Ctrl + Shift + Down
     if (event->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier) && event->key() == Qt::Key_Down) {
         QTextCursor cursor = textCursor();

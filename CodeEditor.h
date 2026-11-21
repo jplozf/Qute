@@ -4,6 +4,8 @@
 #include <QFileSystemWatcher>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QTextBlock>
+#include <QTextCursor>
 #include "SyntaxHighlighter.h"
 
 class LineNumberArea;
